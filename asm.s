@@ -80,13 +80,28 @@ printAllFiles: # (NO ARGS) NO RETURN
     pushl %ebp
     movl %esp, %ebp
     
-    pushl $0 # -4(%ebp): current file descriptor
+    xorl %eax, %eax # %eax: current file descriptor
+
+    xorl %ebx, %ebx # %ebx: start index of current file
 
     lea mem, %edi
     xorl %ecx, %ecx
     printAllFiles_loop:
         cmp n, %ecx
         je printAllFiles_loop_exit
+
+        cmp %eax, (%edi, %ecx, 4)
+        je printAllFiles_loop_continue
+        
+        # Found a new file:
+        cmp %eax, $0
+        jne printAllFiles_loop_if1_exit # If we're coming from an empty block
+        movl (%edi, %ecx, 4), %eax
+        
+
+        printAllFiles_loop_if1_exit:
+
+        
 
         printAllFiles_loop_continue:
         incl %ecx
