@@ -1,5 +1,5 @@
 .data           
-    mem: .space 1024
+    mem: .space 4096 # Array of longs instead of bytes so that its easier to work with
     n: .long 1024
     
     format_numar: .asciz "%d"
@@ -30,13 +30,10 @@ printMemoryRange: # (startIndex:.long, endIndex:.long) NO RETURN
         cmpl %ebx, %ecx
         je printMemoryRange_exit
 
-        xorl %eax, %eax
-        movb (%edi, %ecx, 1), %al
+        pushl %ecx # Save registry before printf call
 
-        pushl %ecx # Save registry   before printf call
-
-        pushl %eax
-        pushl $format_2numereNL
+        pushl (%edi, %ecx, 4)
+        pushl $format_numarNL
         call printf
         popl %edx
         popl %edx
@@ -61,12 +58,9 @@ printMemory: # (NO ARGS) NO RETURN
         cmpl n, %ecx
         je printMemory_exit
 
-        xorl %eax, %eax
-        movb (%edi, %ecx, 1), %al
-
         pushl %ecx # Save registry before printf call
 
-        pushl %eax
+        pushl (%edi, %ecx, 4)
         pushl $format_2numereNL
         call printf
         popl %ebx
@@ -85,6 +79,7 @@ printMemory: # (NO ARGS) NO RETURN
 printAllFiles: # (NO ARGS) NO RETURN
     pushl %ebp
     movl %esp, %ebp
+    
     pushl $0 # -4(%ebp): current file descriptor
 
     lea mem, %edi
@@ -106,14 +101,13 @@ printAllFiles: # (NO ARGS) NO RETURN
 
 
 # FOR UTILITY: Sets all the elements between startIndex:endIndex to fillWith
-fillMemoryRange: # (fillWith:.word (de fapt un byte), startIndex:.long, endIndex:.long) NO RETURN
+fillMemoryRange: # (fillWith:.long, startIndex:.long, endIndex:.long) NO RETURN
     pushl %ebp
     movl %esp, %ebp
 
     lea mem, %edi
 
-    xorl %eax, %eax
-    movw  8(%ebp), %ax
+    movl 8(%ebp), %edx # %edx: fillWith
     
     movl 12(%ebp), %ecx
     movl 16(%ebp), %ebx
@@ -122,7 +116,7 @@ fillMemoryRange: # (fillWith:.word (de fapt un byte), startIndex:.long, endIndex
         cmpl %ebx, %ecx
         je fillMemoryRange_exit
 
-        movb %al, (%edi, %ecx, 1)    
+        movl %edx, (%edi, %ecx, 4) # mem[%ecx] = fillWith   
 
         incl %ecx
         jmp fillMemoryRange_loop
@@ -166,9 +160,7 @@ memADD: # (descriptor:.long, dimensiune:.long in bytes) RETURNS (%eax: startInde
         cmpl n, %ecx
         je memADD_failedToFindSpace # If we have gone through the entire memory that means we didnt find a space for the file
 
-        xorl %edx, %edx
-        movb (%edi, %ecx, 1), %dl # For debugging REMOVE LATER
-        cmpl $0, %edx # Check if the current block is occupied 
+        cmpl $0, (%edi, %ecx, 4) # Check if the current block is occupied 
         jne memADD_if_foundOccupiedBlock
 
         # Current block is free:
@@ -243,8 +235,6 @@ memGET: # (descriptor:.long) RETURNS (%eax: startIndex, %ebx: endIndex)
     # %ecx: current index
     xorl %ecx, %ecx
 
-    # %edx: descriptor byte in %dl
-    xorl %edx, %edx
     movl 8(%ebp), %edx
 
     lea mem, %edi
@@ -252,7 +242,7 @@ memGET: # (descriptor:.long) RETURNS (%eax: startIndex, %ebx: endIndex)
         cmpl n, %ecx
         je memGET_cantFind
 
-        cmpb (%edi, %ecx, 1), %dl
+        cmpl (%edi, %ecx, 4), %edx
         jne memGET_if__exit
         movl %ecx, %eax # Found the file, store index of the first block of the file
         jmp memGET_found
@@ -268,7 +258,7 @@ memGET: # (descriptor:.long) RETURNS (%eax: startIndex, %ebx: endIndex)
             cmpl n, %ecx
             je memGET_while_exit
 
-            cmpb (%edi, %ecx, 1), %dl
+            cmpl (%edi, %ecx, 4), %edx
             jne memGET_while_exit
 
             incl %ecx
