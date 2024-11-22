@@ -135,6 +135,9 @@ printAllFiles: # (NO ARGS) NO RETURN
     cmp %eax, (%edi, %ecx, 4)
     jne printAllFiles_exit
 
+    cmp $0, %eax
+    je printAllFiles_exit
+
     pushl %ecx
     pushl %ebx
     pushl %eax
@@ -328,25 +331,37 @@ memGET: # (descriptor:.long) RETURNS (%eax: startIndex, %ebx: endIndex)
         jmp memGET_exit
 
     memGET_exit:
-        pushl %ebx
-        pushl %eax
-        pushl $format_rangeNL
-        call printf
-        popl %edx
-        popl %edx
-        popl %edx
+        ; pushl %ebx
+        ; pushl %eax
+        ; pushl $format_rangeNL
+        ; call printf
+        ; popl %edx
+        ; popl %edx
+        ; popl %edx
 
         popl %ebp
         ret
 
 # FOR TASK: Delete file with descriptor and print all files
-memDELETE:
+memDELETE: # (descriptor: .long) NO RETURNS
     pushl %ebp
     movl %esp, %ebp
 
-    
+    pushl 8(%ebp)
+    call memGET # Get the file memory range
+    popl %edx
 
-    memDELETE:
+    pushl %ebx
+    pushl %eax
+    pushl $0
+    call fillMemoryRange # Fill it with 0 / Remove the file
+    popl %edx
+    popl %edx
+    popl %edx
+
+    call printAllFiles
+
+    memDELETE_exit:
         popl %ebp
         ret
     
@@ -408,7 +423,35 @@ cmd_readGET: # (NO ARGS) NO RETURN
     call memGET
     popl %edx
 
+    pushl %ebx
+    pushl %eax
+    pushl $format_rangeNL   
+    call printf # Print the GET result
+    popl %edx
+    popl %edx
+    popl %edx
+
     cmd_readGET_exit:
+        popl %ebp
+        ret
+
+# FOR READING:
+#   Read DELETE command inputs
+cmd_readDELETE: # (NO ARGS) NO RETURN
+    pushl %ebp
+    movl %esp, %ebp
+
+    pushl $auxVar1
+    pushl $format_numarNL
+    call scanf
+    popl %edx
+    popl %edx
+    
+    pushl auxVar1
+    call memDELETE
+    popl %edx 
+
+    cmd_readDELETE_exit:
         popl %ebp
         ret
 
@@ -449,7 +492,7 @@ cmd_readOperations: # (NO ARGS) NO RETURN
 
         cmpl $3, auxVar1
         jne cmd_readOperations_loop_if_DELETE_exit
-        # Execute DELETE operation
+        call cmd_readDELETE
         jmp cmd_readOperations_loop_continue
         cmd_readOperations_loop_if_DELETE_exit:
 
@@ -469,9 +512,6 @@ cmd_readOperations: # (NO ARGS) NO RETURN
 .global main
 main:
     call cmd_readOperations
-
-et_bp:
-    call printAllFiles
 
 exit:
     movl $1, %eax
