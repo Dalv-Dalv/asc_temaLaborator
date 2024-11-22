@@ -84,6 +84,8 @@ printAllFiles: # (NO ARGS) NO RETURN
 
     xorl %ebx, %ebx # %ebx: start index of current file
 
+    # %edx: auxiliary 'variable'
+
     lea mem, %edi
     xorl %ecx, %ecx
     printAllFiles_loop:
@@ -97,10 +99,11 @@ printAllFiles: # (NO ARGS) NO RETURN
         cmp %eax, $0
         jne printAllFiles_loop_if1_exit # If we're coming from an empty block
         movl (%edi, %ecx, 4), %eax
-        
 
         printAllFiles_loop_if1_exit:
-
+        movl %ecx, %edx
+        subl $1, %edx
+        
         
 
         printAllFiles_loop_continue:
