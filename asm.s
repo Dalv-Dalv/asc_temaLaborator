@@ -85,7 +85,6 @@ printMemory: # (NO ARGS) NO RETURN
 printAllFiles: # (NO ARGS) NO RETURN
     pushl %ebp
     movl %esp, %ebp
-
     pushl $0 # -4(%ebp): current file descriptor
 
     lea mem, %edi
