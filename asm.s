@@ -253,7 +253,7 @@ memGET: # (descriptor:.long) RETURNS (%eax: startIndex, %ebx: endIndex)
         jmp memGET_loop
 
     memGET_found: # Found the file, search for where it ends
-        # while(mem[%ecx] == %dl):
+        # while(mem[%ecx] == %dl):              
         memGET_while:
             cmpl n, %ecx
             je memGET_while_exit
