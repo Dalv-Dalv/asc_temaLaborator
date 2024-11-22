@@ -96,21 +96,54 @@ printAllFiles: # (NO ARGS) NO RETURN
         je printAllFiles_loop_continue
         
         # Found a new file:
-        cmp %eax, $0
-        jne printAllFiles_loop_if1_exit # If we're coming from an empty block
+        cmp $0, %eax
+        jne printAllFiles_loop_if1_exit 
+        # If we are coming from an empty block:
         movl (%edi, %ecx, 4), %eax
+        movl %ecx, %ebx
+        jmp printAllFiles_loop_continue
 
         printAllFiles_loop_if1_exit:
+        # If we are coming from a different block:
+        # Print the previous file
         movl %ecx, %edx
         subl $1, %edx
-        
-        
+
+        pushl %ecx # Save register before printf call
+
+        pushl %edx
+        pushl %ebx
+        pushl %eax
+        pushl $format_fisierNL
+        call printf
+        popl %edx
+        popl %edx
+        popl %edx
+        popl %edx
+
+        popl %ecx # Restore register after printf call
+
+        movl (%edi, %ecx, 4), %eax
+        movl %ecx, %ebx
 
         printAllFiles_loop_continue:
         incl %ecx
         jmp printAllFiles_loop
 
     printAllFiles_loop_exit:
+    subl $1, %ecx
+    cmp %eax, (%edi, %ecx, 4)
+    jne printAllFiles_exit
+
+    pushl %ecx
+    pushl %ebx
+    pushl %eax
+    pushl $format_fisierNL
+    call printf
+    popl %edx
+    popl %edx
+    popl %edx
+    popl %edx
 
 
     printAllFiles_exit:
@@ -304,7 +337,19 @@ memGET: # (descriptor:.long) RETURNS (%eax: startIndex, %ebx: endIndex)
         popl %edx
 
         popl %ebp
-        ret  
+        ret
+
+# FOR TASK: Delete file with descriptor and print all files
+memDELETE:
+    pushl %ebp
+    movl %esp, %ebp
+
+    
+
+    memDELETE:
+        popl %ebp
+        ret
+    
 
 # FOR READING:
 #   Read ADD command inputs
@@ -424,6 +469,9 @@ cmd_readOperations: # (NO ARGS) NO RETURN
 .global main
 main:
     call cmd_readOperations
+
+et_bp:
+    call printAllFiles
 
 exit:
     movl $1, %eax
