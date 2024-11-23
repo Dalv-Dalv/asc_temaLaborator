@@ -8,6 +8,7 @@
     format_2numereNL: .asciz "%d %d\n"
     format_fisierNL: .asciz "%d: (%d, %d)\n"
     format_rangeNL: .asciz "(%d, %d)\n" 
+    format_newLine: .asciz "\n"
 
     # Input related variables:
     nrOperatii: .long 0
@@ -33,7 +34,7 @@ printMemoryRange: # (startIndex:.long, endIndex:.long) NO RETURN
         pushl %ecx # Save registry before printf call
 
         pushl (%edi, %ecx, 4)
-        pushl $format_numarNL
+        pushl $format_numar
         call printf
         popl %edx
         popl %edx
@@ -44,6 +45,10 @@ printMemoryRange: # (startIndex:.long, endIndex:.long) NO RETURN
         jmp printMemoryRange_loop
 
     printMemoryRange_exit:
+        pushl $format_newLine
+        call printf
+        popl %edx
+
         popl %ebp
         ret
 
@@ -331,13 +336,6 @@ memGET: # (descriptor:.long) RETURNS (%eax: startIndex, %ebx: endIndex)
         jmp memGET_exit
 
     memGET_exit:
-        ; pushl %ebx
-        ; pushl %eax
-        ; pushl $format_rangeNL
-        ; call printf
-        ; popl %edx
-        ; popl %edx
-        ; popl %edx
 
         popl %ebp
         ret
@@ -366,6 +364,8 @@ memDELETE: # (descriptor: .long) NO RETURNS
         ret
 
 # FOR TASK: Defragment
+#   Loop using two pointers %eax, %ebx
+#   %ebx goes through the memory normally while %eax only gets incremented if there isnt a 0 at %ebx
 memDEFRAGMENT: # (NO ARGS) NO RETURN
     pushl %ebp
     movl %esp, %ebp
@@ -377,7 +377,7 @@ memDEFRAGMENT: # (NO ARGS) NO RETURN
     lea mem, %edi
     memDEFRAGMENT_loop:
         cmp n, %ebx
-        je memDEFRAGMENT_loop_exit
+        je memDEFRAGMENT_cleanupLoop
 
         movl (%edi, %ebx, 4), %edx
         movl %edx, (%edi, %eax, 4)
@@ -391,9 +391,18 @@ memDEFRAGMENT: # (NO ARGS) NO RETURN
         incl %ebx
         jmp memDEFRAGMENT_loop
 
-    memDEFRAGMENT_loop_exit:   
+    memDEFRAGMENT_cleanupLoop: # Fill with 0s to the end
+        cmp n, %eax
+        je memDEFRAGMENT_exit
+
+        movl $0, (%edi, %eax, 4)
+
+        incl %eax
+        jmp memDEFRAGMENT_cleanupLoop
 
     memDEFRAGMENT_exit:
+        call printAllFiles
+
         popl %ebp
         ret
     
