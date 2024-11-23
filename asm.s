@@ -391,8 +391,7 @@ memDEFRAGMENT: # (NO ARGS) NO RETURN
         incl %ebx
         jmp memDEFRAGMENT_loop
 
-    memDEFRAGMENT_loop_exit:
-    # PUT 0s FROM %eax TO THE END                                                                    <------------------
+    memDEFRAGMENT_loop_exit:   
 
     memDEFRAGMENT_exit:
         popl %ebp
@@ -505,7 +504,7 @@ cmd_readOperations: # (NO ARGS) NO RETURN
         cmpl $0, nrOperatii
         je cmd_readOperations_exit
 
-        pushl $auxVar1 # Descriptor
+        pushl $auxVar1 # Which command to execute
         pushl $format_numarNL
         call scanf
         popl %edx
