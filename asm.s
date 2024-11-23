@@ -364,6 +364,39 @@ memDELETE: # (descriptor: .long) NO RETURNS
     memDELETE_exit:
         popl %ebp
         ret
+
+# FOR TASK: Defragment
+memDEFRAGMENT: # (NO ARGS) NO RETURN
+    pushl %ebp
+    movl %esp, %ebp
+
+    xorl %eax, %eax # %eax: real/trailing index
+
+    xorl %ebx, %ebx # %ebx: effective/leading index
+
+    lea mem, %edi
+    memDEFRAGMENT_loop:
+        cmp n, %ebx
+        je memDEFRAGMENT_loop_exit
+
+        movl (%edi, %ebx, 4), %edx
+        movl %edx, (%edi, %eax, 4)
+
+        cmpl $0, (%edi, %ebx, 4)
+        je memDEFRAGMENT_loop_continue
+        incl %eax
+
+        memDEFRAGMENT_loop_continue:
+
+        incl %ebx
+        jmp memDEFRAGMENT_loop
+
+    memDEFRAGMENT_loop_exit:
+    # PUT 0s FROM %eax TO THE END                                                                    <------------------
+
+    memDEFRAGMENT_exit:
+        popl %ebp
+        ret
     
 
 # FOR READING:
@@ -497,6 +530,7 @@ cmd_readOperations: # (NO ARGS) NO RETURN
         cmd_readOperations_loop_if_DELETE_exit:
 
         # Execute Defrag operation
+        call memDEFRAGMENT
 
         cmd_readOperations_loop_continue:
 
