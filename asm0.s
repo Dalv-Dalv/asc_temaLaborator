@@ -15,7 +15,7 @@
 
     # Input related variables:
     nrOperatii: .long 0
-    operatieID: .long 0
+    
     # Auxiliary variables used mainly for scanf; they can be used anywhere without managing call saving
     auxVar1: .long 0
     auxVar2: .long 0
