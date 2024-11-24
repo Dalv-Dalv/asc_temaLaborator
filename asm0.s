@@ -352,6 +352,9 @@ memDELETE: # (descriptor: .long) NO RETURNS
     call memGET # Get the file memory range
     popl %edx
 
+    cmp $0, %ebx # If get couldnt find it, exit out
+    je memDELETE_exit
+
     pushl %ebx
     pushl %eax
     pushl $0
@@ -544,6 +547,10 @@ cmd_readOperations: # (NO ARGS) NO RETURN
         call memDEFRAGMENT
 
         cmd_readOperations_loop_continue:
+
+        pushl $format_newLine
+        call printf
+        popl %edx
 
         decl nrOperatii
         jmp cmd_readOperations_loop

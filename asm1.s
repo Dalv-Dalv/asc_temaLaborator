@@ -10,6 +10,7 @@
     format_numarNL: .asciz "%d\n"
     format_addInputNL: .asciz "%d\n%d\n"        
     format_2numereNL: .asciz "%d %d\n"
+    format_descriptor: .asciz "%d: "
     format_fisierNL: .asciz "%d: ((%d, %d), (%d, %d))\n"
     format_rangeNL: .asciz "((%d, %d), (%d, %d))\n" 
     format_newLine: .asciz "\n"
@@ -80,6 +81,113 @@ printMemoryRange: # (startX:.long, startY:.long, endX:.long, endY:.long) NO RETU
         pushl $format_newLine
         call printf
         popl %edx
+        popl %ebp
+        ret
+
+# FOR UTILITY/DEBUG: Transforms contiguous indices into (X, Y) indices and prints them
+printRange: # (startIndex:.long, endIndex:.long) NO RETURNS
+    pushl %ebp
+    movl %esp, %ebp
+
+    movl 12(%ebp), %eax
+    xorl %edx, %edx
+    divl n
+    pushl %eax # %eax: endY
+    pushl %edx # %edx: endX
+
+    movl 8(%ebp), %eax
+    xorl %edx, %edx
+    divl n
+    pushl %eax # %eax: startY
+    pushl %edx # %edx: startX
+
+    pushl $format_rangeNL
+    call printf
+    popl %edx
+    popl %edx
+    popl %edx
+    popl %edx
+    popl %edx
+
+    pushRangeOntoStack_exit:
+        popl %ebp
+        ret
+
+# FOR UTILITY: Prints all files in format id: (i, j)
+printAllFiles: # (NO ARGS) NO RETURN
+    pushl %ebp
+    movl %esp, %ebp
+    
+    xorl %eax, %eax # %eax: current file descriptor
+
+    xorl %ebx, %ebx # %ebx: start index of current file
+
+    # %edx: auxiliary 'variable'
+
+    lea mem, %edi
+    xorl %ecx, %ecx
+    printAllFiles_loop:
+        cmp nTotal, %ecx
+        je printAllFiles_loop_exit
+
+        cmp %eax, (%edi, %ecx, 4)
+        je printAllFiles_loop_continue
+        
+        # Found a new file:
+        cmp $0, %eax
+        jne printAllFiles_loop_if1_exit 
+        # If we are coming from an empty block:
+        movl (%edi, %ecx, 4), %eax
+        movl %ecx, %ebx
+        jmp printAllFiles_loop_continue
+
+        printAllFiles_loop_if1_exit:
+        # If we are coming from a different block:
+        # Print the previous file
+
+        pushl %ecx # Save register before printf call
+
+        pushl %eax # descriptor
+        pushl $format_descriptor
+        call printf
+        popl %edx
+        popl %eax
+
+        # pushl %ecx, but its already on the stack
+        pushl %ebx
+        call printRange
+        popl %edx
+        popl %ecx # Restore register after printf call
+
+        movl (%edi, %ecx, 4), %eax
+        movl %ecx, %ebx
+
+        printAllFiles_loop_continue:
+        incl %ecx
+        jmp printAllFiles_loop
+
+    printAllFiles_loop_exit:
+    subl $1, %ecx
+    cmp %eax, (%edi, %ecx, 4)
+    jne printAllFiles_exit
+
+    cmp $0, %eax
+    je printAllFiles_exit
+
+    pushl %eax # descriptor
+    pushl $format_descriptor
+    call printf
+    popl %edx
+    popl %eax
+
+    pushl %ecx
+    pushl %ebx
+    call printRange
+    popl %edx
+    popl %edx
+
+
+    printAllFiles_exit:
         popl %ebp
         ret
 
@@ -178,10 +286,8 @@ memADD: # (descriptor:.long, dimensiune:.long in bytes) NO RETURNS
 
 
     memADD_failedToFindSpace:
-        pushl $0
-        pushl $0
-        pushl $0
-        pushl $0
+        xorl %eax, %eax
+        xorl %ebx, %ebx
 
         jmp memADD_exit
     
@@ -190,7 +296,6 @@ memADD: # (descriptor:.long, dimensiune:.long in bytes) NO RETURNS
         subl $1, %ebx
 
         pushl %eax # Store registers to keep after function call
-        pushl %ebx # Store registers to keep after function call
 
         pushl %ebx
         pushl %eax
@@ -200,44 +305,115 @@ memADD: # (descriptor:.long, dimensiune:.long in bytes) NO RETURNS
         popl %edx
         popl %edx
 
-        popl %ebx # Restore registers
         popl %eax # Restore registers
-
-        # Transform indices to (X,Y) values:
-        xorl %edx, %edx
-        divl n
-        # In %edx we will have startX and in %eax we will have startY
-        pushl %eax # startY
-        pushl %edx # startX
-
-        xorl %edx, %edx
-        movl %ebx, %eax
-        divl n
-        # In %edx we will have endX and in %eax we will have endY
-        
-        popl %ebx # startX
-        popl %ecx # startY
-
-        pushl %eax
-        pushl %edx
-        pushl %ecx
-        pushl %ebx
         
         jmp memADD_exit
 
     memADD_exit:
-        # Parameters are already pushed onto the stack in _foundSpace or in _failedToFindSpace
-        pushl 8(%ebp)
-        pushl $format_fisierNL
+        pushl %eax # Save registers before printf call
+        pushl %ebx
+
+        pushl 8(%ebp) # descriptor
+        pushl $format_descriptor
         call printf
-        popl %ebp
-        popl %ebp
-        popl %ebp
-        popl %ebp
-        popl %ebp
-        popl %ebp
+        popl %edx
+        popl %edx
+
+        popl %ebx
+        popl %eax # Recover registers after printf call
+
+        pushl %ebx
+        pushl %eax
+        call printRange
+        popl %edx
+        popl %edx
 
         popl %ebp # Pop local variable
+        popl %ebp
+        ret
+
+# FOR TASK: Get file range from memory
+#   Exactly the same as the unidimensional case
+#   Loop through the memory until the first occurance of the descriptor and then measure how much it spans
+memGET: # (descriptor:.long) RETURNS (%eax: startIndex, %ebx: endIndex), indices are considered to be contiguous
+    pushl %ebp
+    movl %esp, %ebp
+
+    # %eax: start index of current range
+    xorl %eax, %eax
+
+    # %ecx: current index
+    xorl %ecx, %ecx
+
+    movl 8(%ebp), %edx
+
+    lea mem, %edi
+    memGET_loop:
+        cmpl nTotal, %ecx
+        je memGET_cantFind
+
+        cmpl (%edi, %ecx, 4), %edx
+        jne memGET_if__exit
+        movl %ecx, %eax # Found the file, store index of the first block of the file
+        jmp memGET_found
+
+        memGET_if__exit:
+        
+        incl %ecx
+        jmp memGET_loop
+
+    memGET_found: # Found the file, search for where it ends
+        # while(mem[%ecx] == %dl):              
+        memGET_while:
+            cmpl nTotal, %ecx
+            je memGET_while_exit
+
+            cmpl (%edi, %ecx, 4), %edx
+            jne memGET_while_exit
+
+            incl %ecx
+
+            jmp memGET_while
+
+        memGET_while_exit:
+        subl $1, %ecx
+        movl %ecx, %ebx # Store end index in %ebx for return
+
+        jmp memGET_exit
+
+    memGET_cantFind:
+        xorl %eax, %eax
+        xorl %ebx, %ebx
+        jmp memGET_exit
+
+    memGET_exit:
+        popl %ebp
+        ret
+
+# FOR TASK: Delete file with descriptor and print all files
+#   Exactly the same as unidimensional case
+memDELETE: # (descriptor: .long) NO RETURNS
+    pushl %ebp
+    movl %esp, %ebp
+
+    pushl 8(%ebp)
+    call memGET # Get the file memory range
+    popl %edx
+
+    cmp $0, %ebx # If get couldnt find it, exit out
+    je memDELETE_exit
+
+    pushl %ebx
+    pushl %eax
+    pushl $0
+    call fillMemoryRange # Fill it with 0 / Remove the file
+    popl %edx
+    popl %edx
+    popl %edx
+
+    call printAllFiles
+
+    memDELETE_exit:
         popl %ebp
         ret
 
@@ -282,6 +458,52 @@ cmd_readADD: # (NO ARGS) NO RETURN
         popl %ebp
         ret
 
+# FOR READING:
+#   Read GET command inputs
+cmd_readGET: # (NO ARGS) NO RETURN
+    pushl %ebp
+    movl %esp, %ebp
+
+    pushl $auxVar1 # descriptor
+    pushl $format_numarNL
+    call scanf
+    popl %edx
+    popl %edx
+
+    pushl auxVar1
+    call memGET
+    popl %edx
+
+    pushl %ebx
+    pushl %eax
+    call printRange
+    popl %edx
+    popl %edx
+
+    cmd_readGET_exit:
+        popl %ebp
+        ret
+
+# FOR READING:
+#   Read DELETE command inputs
+cmd_readDELETE: # (NO ARGS) NO RETURN
+    pushl %ebp
+    movl %esp, %ebp
+
+    pushl $auxVar1
+    pushl $format_numarNL
+    call scanf
+    popl %edx
+    popl %edx
+    
+    pushl auxVar1
+    call memDELETE
+    popl %edx 
+
+    cmd_readDELETE_exit:
+        popl %ebp
+        ret
+
 # FOR READING: 
 #   Main reading function
 cmd_readOperations: # (NO ARGS) NO RETURN
@@ -312,13 +534,13 @@ cmd_readOperations: # (NO ARGS) NO RETURN
 
         cmpl $2, auxVar1
         jne cmd_readOperations_loop_if_GET_exit
-        # call cmd_readGET # Read input for GET operation and execute it
+        call cmd_readGET # Read input for GET operation and execute it
         jmp cmd_readOperations_loop_continue
         cmd_readOperations_loop_if_GET_exit:
 
         cmpl $3, auxVar1
         jne cmd_readOperations_loop_if_DELETE_exit
-        # call cmd_readDELETE
+        call cmd_readDELETE
         jmp cmd_readOperations_loop_continue
         cmd_readOperations_loop_if_DELETE_exit:
 
@@ -326,6 +548,10 @@ cmd_readOperations: # (NO ARGS) NO RETURN
         # call memDEFRAGMENT
 
         cmd_readOperations_loop_continue:
+
+        pushl $format_newLine
+        call printf
+        popl %edx
 
         decl nrOperatii
         jmp cmd_readOperations_loop
