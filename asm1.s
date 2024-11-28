@@ -417,6 +417,66 @@ memDELETE: # (descriptor: .long) NO RETURNS
         popl %ebp
         ret
 
+# FOR TASK: Defragment
+#   Loop using two pointers %eax, %ebx
+#   %ebx goes through the memory normally while %eax only gets incremented if there isnt a 0 at %ebx
+memDEFRAGMENT: # (NO ARGS) NO RETURN
+    pushl %ebp
+    movl %esp, %ebp
+
+    xorl %eax, %eax # Index to latest empty space
+    lea mem, %edi
+    # Skip over any files at the start of the memory
+    memDEFRAGMENT_initializationLoop: # Move %eax to the first empty space
+        cmpl nTotal, %eax
+        je memDEFRAGMENT_exit
+
+        cmpl $0, (%edi, %eax, 4)
+        je memDEFRAGMENT_initializationLoop_exit
+
+        incl %eax
+        jmp memDEFRAGMENT_initializationLoop
+    memDEFRAGMENT_initializationLoop_exit:
+
+
+    movl %eax, %ecx # %ecx: Iterator
+
+    xorl %ebx, %ebx # Size of the current file
+
+    memDEFRAGMENT_mainLoop:
+        cmpl nTotal, %ecx
+        je memDEFRAGMENT_mainLoop_exit
+
+        cmpl $0, (%edi, %ecx, 4)
+        je memDEFRAGMENT_mainLoop_continue
+
+        # Found a file
+        movl %ecx, %ebx
+        memDEFRAGMENT_mainLoop_while: # Loop through the file and determine its size 
+            cmpl nTotal, %ebp
+            je memDEFRAGMENT_mainLoop_while_exit
+            cmpl $0, (%edi, %ebx, 4)
+            je memDEFRAGMENT_mainLoop_while_exit
+
+            incl %ebx
+            jmp memDEFRAGMENT_mainLoop_while
+
+        memDEFRAGMENT_mainLoop_while_exit:
+
+
+        memDEFRAGMENT_mainLoop_continue:
+        incl %ecx
+        jmp memDEFRAGMENT_loop
+
+    memDEFRAGMENT_mainLoop_exit:
+
+    memDEFRAGMENT_exit:
+        call printAllFiles
+
+        popl %ebp
+        ret
+
+
 # FOR READING:
 #   Read ADD command inputs
 cmd_readADD: # (NO ARGS) NO RETURN
@@ -540,12 +600,12 @@ cmd_readOperations: # (NO ARGS) NO RETURN
 
         cmpl $3, auxVar1
         jne cmd_readOperations_loop_if_DELETE_exit
-        call cmd_readDELETE
+        call cmd_readDELETE # Read input for DELETE operation and execute it
         jmp cmd_readOperations_loop_continue
         cmd_readOperations_loop_if_DELETE_exit:
 
         # Execute Defrag operation
-        # call memDEFRAGMENT
+        call memDEFRAGMENT
 
         cmd_readOperations_loop_continue:
 

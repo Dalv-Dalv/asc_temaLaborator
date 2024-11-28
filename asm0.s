@@ -548,9 +548,9 @@ cmd_readOperations: # (NO ARGS) NO RETURN
 
         cmd_readOperations_loop_continue:
 
-        pushl $format_newLine
-        call printf
-        popl %edx
+        # pushl $format_newLine
+        # call printf
+        # popl %edx
 
         decl nrOperatii
         jmp cmd_readOperations_loop
