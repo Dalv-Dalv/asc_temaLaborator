@@ -1,7 +1,7 @@
 # Cerinta bidimensional
 
 .data           
-    mem: .space 4194304 # 2D 1024x1024 Array of longs instead of bytes so that its easier to work with
+    mem: .space 64 # 2D 1024x1024 Array of longs instead of bytes so that its easier to work with
     n: .long 8
     nTotal: .long 64 # n * n
     
@@ -418,8 +418,9 @@ memDELETE: # (descriptor: .long) NO RETURNS
         ret
 
 # FOR TASK: Defragment
-#   Loop using two pointers %eax, %ebx
-#   %ebx goes through the memory normally while %eax only gets incremented if there isnt a 0 at %ebx
+#   Loop through the memory, save the first position of a free block, continue looping
+# until we find a file, then determine its size and after that check if it can be
+# placed where we found the free block; loop like this until the end of the memory
 memDEFRAGMENT: # (NO ARGS) NO RETURN
     pushl %ebp
     movl %esp, %ebp
@@ -438,7 +439,6 @@ memDEFRAGMENT: # (NO ARGS) NO RETURN
         jmp memDEFRAGMENT_initializationLoop
     memDEFRAGMENT_initializationLoop_exit:
 
-
     movl %eax, %ecx # %ecx: Iterator
 
     xorl %ebx, %ebx # Size of the current file
@@ -450,8 +450,8 @@ memDEFRAGMENT: # (NO ARGS) NO RETURN
         cmpl $0, (%edi, %ecx, 4)
         je memDEFRAGMENT_mainLoop_continue
 
-        # Found a file
-        movl %ecx, %ebx
+        # Found a file:
+        movl %ecx, %ebx # Save position of the start of the file for later
         memDEFRAGMENT_mainLoop_while: # Loop through the file and determine its size 
             cmpl nTotal, %ebp
             je memDEFRAGMENT_mainLoop_while_exit
@@ -460,13 +460,36 @@ memDEFRAGMENT: # (NO ARGS) NO RETURN
 
             incl %ebx
             jmp memDEFRAGMENT_mainLoop_while
-
         memDEFRAGMENT_mainLoop_while_exit:
+
+        # Check if we can fit the file at %eax
         subl %ecx, %ebx
         subl $1, %ebx
 
-        # Check if we can fit the file 
+        pushl %eax # Save the index for later
 
+        xorl %edx, %edx
+        divl n # In %eax we will have the row (Y value) and in %edx we will have the column (X value)
+        
+        # Calculate how many free blocks theres left until the end of the row
+        pushl n
+        subl %edx, (%esp)
+        subl $1, (%esp)
+        popl %edx
+
+        cmp %edx, %ebx
+        jg memDEFRAGMENT_mainLoop_cantFit # File cant fit
+
+        # File can be fit:
+
+        popl %eax # Recover the index
+        
+
+
+        jmp memDEFRAGMENT_mainLoop_continue
+
+        memDEFRAGMENT_mainLoop_cantFit:
+        popl %eax # Pop the index
 
         memDEFRAGMENT_mainLoop_continue:
         incl %ecx

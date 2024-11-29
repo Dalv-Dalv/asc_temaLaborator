@@ -1,0 +1,7 @@
+wawa
+
+de la 38 incepe
+
+4 bytes d_ino
+4 bytes d_off
+2 bytes d_reclen
