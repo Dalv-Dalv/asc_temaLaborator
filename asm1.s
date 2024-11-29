@@ -462,11 +462,15 @@ memDEFRAGMENT: # (NO ARGS) NO RETURN
             jmp memDEFRAGMENT_mainLoop_while
 
         memDEFRAGMENT_mainLoop_while_exit:
+        subl %ecx, %ebx
+        subl $1, %ebx
+
+        # Check if we can fit the file 
 
 
         memDEFRAGMENT_mainLoop_continue:
         incl %ecx
-        jmp memDEFRAGMENT_loop
+        jmp memDEFRAGMENT_mainLoop
 
     memDEFRAGMENT_mainLoop_exit:
 

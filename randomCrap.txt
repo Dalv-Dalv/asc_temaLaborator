@@ -1,0 +1,62 @@
+11100000
+00055555
+
+%eax = 3
+%ebx = 4
+
+
+.data
+dir_path:    .asciz "/home/dalv/Dalv/University/ASC/TemaLaborator/Test_ReadFilesFromDirectory/Files"    # Path to the directory
+buffer:      .space 4096                   # Buffer for `getdents`
+fmt:         .asciz "Pls %s dont be empty\n"      # Format for output (filename and size)
+dir_fd:      .long 0                       # File descriptor for the directory
+
+.text
+.global main
+main:
+    # Open the directory
+    movl $5, %eax                          # syscall: open
+    movl $dir_path, %ebx                   # Path to directory
+    movl $0, %ecx                          # Flags (read-only)
+    int $0x80
+    movl %eax, dir_fd                      # Store directory file descriptor
+
+    # Read directory entries with getdents
+    movl $141, %eax                        # syscall: getdents
+    movl dir_fd, %ebx                      # Directory file descriptor
+    movl $buffer, %ecx                     # Buffer to store entries
+    movl $4096, %edx                       # Buffer size
+    int $0x80
+    testl %eax, %eax                       # Check if any entries read
+    jle close_dir                          # Exit if none
+    movl %eax, %edi                        # Number of bytes read
+
+    # Parse directory entries
+    movl $buffer, %esi                     # Start of buffer
+parse_entry:
+    cmpl %esi, buffer + 4096               # End of buffer?
+    jle close_dir                          # Exit loop
+
+    # Get d_name (file name)
+    leal 10(%esi), %ebx                    # Offset to d_name
+    movl (%esi), %eax                      # Read d_reclen (entry size)
+    addl %eax, %esi                        # Move to the next entry
+
+    # Print filename and size
+    pushl %ebx                             # Push filename onto stack
+    pushl $fmt                             # Push format string
+    call printf                            # Print
+    popl %edx
+    popl %edx
+    jmp parse_entry
+
+close_dir:
+    # Close the directory
+    movl $6, %eax                          # syscall: close
+    movl dir_fd, %ebx                      # Directory file descriptor
+    int $0x80
+
+    # Exit program
+    movl $1, %eax                          # syscall: exit
+    xorl %ebx, %ebx                        # Status 0
+    int $0x80
