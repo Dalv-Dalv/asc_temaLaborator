@@ -6,8 +6,7 @@
     
     # Printf/Scanf formats
     format_number: .asciz "%d"
-    format_numberNL: .asciz "%d\n"
-    format_addInputNL: .asciz "%d\n%d\n"
+    format_addInputNL: .asciz "%d %d"
     format_fileNL: .asciz "%d: (%d, %d)\n"
     format_rangeNL: .asciz "(%d, %d)\n" 
     format_newLine: .asciz "\n"
@@ -504,7 +503,7 @@ cmd_readADD: # (NO ARGS) NO RETURN
     movl %esp, %ebp
 
     pushl $auxVar1
-    pushl $format_numberNL
+    pushl $format_number
     call scanf
     popl %edx
     popl %edx
@@ -545,7 +544,7 @@ cmd_readGET: # (NO ARGS) NO RETURN
     movl %esp, %ebp
 
     pushl $auxVar1 # descriptor
-    pushl $format_numberNL
+    pushl $format_number
     call scanf
     popl %edx
     popl %edx
@@ -573,7 +572,7 @@ cmd_readDELETE: # (NO ARGS) NO RETURN
     movl %esp, %ebp
 
     pushl $auxVar1
-    pushl $format_numberNL
+    pushl $format_number
     call scanf
     popl %edx
     popl %edx
@@ -604,7 +603,7 @@ cmd_readOperations: # (NO ARGS) NO RETURN
         je cmd_readOperations_exit
 
         pushl $auxVar1 # Which command to execute
-        pushl $format_numberNL
+        pushl $format_number
         call scanf
         popl %edx
         popl %edx
