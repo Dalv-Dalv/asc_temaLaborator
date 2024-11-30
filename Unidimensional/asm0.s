@@ -5,20 +5,123 @@
     n: .long 1024
     
     # Printf/Scanf formats
-    format_numar: .asciz "%d"
-    format_numarNL: .asciz "%d\n"
+    format_number: .asciz "%d"
+    format_numberNL: .asciz "%d\n"
     format_addInputNL: .asciz "%d\n%d\n"
-    format_fisierNL: .asciz "%d: (%d, %d)\n"
+    format_fileNL: .asciz "%d: (%d, %d)\n"
     format_rangeNL: .asciz "(%d, %d)\n" 
     format_newLine: .asciz "\n"
 
+    format_physicalFilePrefix: .asciz "File "
+    format_physicalFileSuffix: .asciz ".txt"
+
+    # Buffer mainly used for converting numbers to strings
+    auxBuffer1: .space 128
+    auxBuffer2: .space 128
+
     # Input related variables:
-    nrOperatii: .long 0
+    nrOperations: .long 0
     
     # Auxiliary variables used mainly for scanf; they can be used anywhere without managing call saving
     auxVar1: .long 0
     auxVar2: .long 0
+
 .text
+# FOR UTILITY: Converts number to string
+convertNrToString: # (x:.long, *string) RETURNS VIA *string
+    pushl %ebp
+    movl %esp, %ebp
+
+    movl 8(%ebp), %eax # Number to convert
+
+    xorl %ecx, %ecx
+    convertNrToString_while: # Push all digits onto stack
+        cmpl $0, %eax
+        je convertNrToString_while_exit
+
+        xorl %edx, %edx
+        movl $10, %ebx
+        divl %ebx
+
+        pushl %edx
+
+        incl %ecx
+        jmp convertNrToString_while
+    convertNrToString_while_exit:
+    
+    movl 12(%ebp), %edi
+
+    xorl %edx, %edx # Index in *string
+    convertNrToString_for: # Build the number back up in ascii
+        popl %eax
+
+        addl $0x30, %eax
+        movb %al, (%edi, %edx, 1)
+
+        incl %edx
+        loop convertNrToString_for
+    
+    movb $0x00, (%edi, %edx, 1) # Add null character
+
+    convertNrToString_exit:
+        popl %ebp
+        ret
+
+# FOR UTILITY: Creates file based on given file descriptor
+createPhysicalFile: # (fileDescriptor: .long) NO RETURN
+    pushl %ebp
+    movl %esp, %ebp
+
+    # Put null character at the start of auxBuffer2, effectively resetting it for strcat calls
+    xorl %ecx, %ecx
+    lea auxBuffer2, %edi
+    movb $0x00, (%edi, %ecx, 1)
+
+    pushl $auxBuffer1
+    pushl 8(%ebp)
+    call convertNrToString
+    popl %edx
+    popl %edx
+
+    # Build the name of the file in auxBuffer2
+    # Add the prefix of the file to auxBuffer2
+    pushl $format_physicalFilePrefix
+    pushl $auxBuffer2
+    call strcat
+    popl %edx
+    popl %edx
+
+    # Add the converted file descriptor to auxBuffer2
+    pushl $auxBuffer1
+    pushl $auxBuffer2
+    call strcat
+    popl %edx
+    popl %edx
+
+    # Add the file sufix to auxBuffer2
+    pushl $format_physicalFileSuffix
+    pushl $auxBuffer2
+    call strcat
+    popl %edx
+    popl %edx
+
+    # Add the newLine character to auxBuffer2
+    pushl $format_newLine # FOR DEBUGGING
+    pushl $auxBuffer2
+    call strcat
+    popl %edx
+    popl %edx
+
+    # Create the file physically
+    movl $5, %eax # Syscall_open
+    movl $auxBuffer2, %ebx # File name
+    movl $0101, %ecx # File flags: O_CREAT | O_WRONLY
+    movl $0777, %edx # File permissions: full permissions
+    int $0x80
+
+    createPhysicalFile_exit:
+        popl %ebp
+        ret
 
 # FOR DEBUG: Prints the memory range startIndex:endIndex
 printMemoryRange: # (startIndex:.long, endIndex:.long) NO RETURN
@@ -36,7 +139,7 @@ printMemoryRange: # (startIndex:.long, endIndex:.long) NO RETURN
         pushl %ecx # Save registry before printf call
 
         pushl (%edi, %ecx, 4)
-        pushl $format_numar
+        pushl $format_number
         call printf
         popl %edx
         popl %edx
@@ -53,7 +156,6 @@ printMemoryRange: # (startIndex:.long, endIndex:.long) NO RETURN
 
         popl %ebp
         ret
-
 
 # FOR UTILITY: Prints all files in format id: (i, j)
 printAllFiles: # (NO ARGS) NO RETURN
@@ -94,7 +196,7 @@ printAllFiles: # (NO ARGS) NO RETURN
         pushl %edx
         pushl %ebx
         pushl %eax
-        pushl $format_fisierNL
+        pushl $format_fileNL
         call printf
         popl %edx
         popl %edx
@@ -121,7 +223,7 @@ printAllFiles: # (NO ARGS) NO RETURN
     pushl %ecx
     pushl %ebx
     pushl %eax
-    pushl $format_fisierNL
+    pushl $format_fileNL
     call printf
     popl %edx
     popl %edx
@@ -237,7 +339,7 @@ memADD: # (descriptor:.long, dimensiune:.long in bytes) RETURNS (%eax: startInde
         pushl %ebx
         pushl %eax
         pushl 8(%ebp)
-        pushl $format_fisierNL
+        pushl $format_fileNL
         call printf
         popl %edx
         popl %edx
@@ -392,7 +494,7 @@ cmd_readADD: # (NO ARGS) NO RETURN
     movl %esp, %ebp
 
     pushl $auxVar1
-    pushl $format_numarNL
+    pushl $format_numberNL
     call scanf
     popl %edx
     popl %edx
@@ -433,7 +535,7 @@ cmd_readGET: # (NO ARGS) NO RETURN
     movl %esp, %ebp
 
     pushl $auxVar1 # descriptor
-    pushl $format_numarNL
+    pushl $format_numberNL
     call scanf
     popl %edx
     popl %edx
@@ -461,7 +563,7 @@ cmd_readDELETE: # (NO ARGS) NO RETURN
     movl %esp, %ebp
 
     pushl $auxVar1
-    pushl $format_numarNL
+    pushl $format_numberNL
     call scanf
     popl %edx
     popl %edx
@@ -481,18 +583,18 @@ cmd_readOperations: # (NO ARGS) NO RETURN
     pushl %ebp
     movl %esp, %ebp
 
-    pushl $nrOperatii
-    pushl $format_numar 
+    pushl $nrOperations
+    pushl $format_number 
     call scanf
     popl %edx
     popl %edx
 
     cmd_readOperations_loop:
-        cmpl $0, nrOperatii
+        cmpl $0, nrOperations
         je cmd_readOperations_exit
 
         pushl $auxVar1 # Which command to execute
-        pushl $format_numarNL
+        pushl $format_numberNL
         call scanf
         popl %edx
         popl %edx
@@ -519,7 +621,7 @@ cmd_readOperations: # (NO ARGS) NO RETURN
         call memDEFRAGMENT
 
         cmd_readOperations_loop_continue:
-        decl nrOperatii
+        decl nrOperations
         jmp cmd_readOperations_loop
 
     cmd_readOperations_exit:
@@ -530,7 +632,23 @@ cmd_readOperations: # (NO ARGS) NO RETURN
 
 .global main
 main:
-    call cmd_readOperations
+    # call cmd_readOperations
+
+    pushl $690
+    call createPhysicalFile
+    popl %edx
+
+    pushl $auxBuffer2
+    call printf
+    popl %edx
+
+    pushl $1
+    call createPhysicalFile
+    popl %edx
+
+    pushl $auxBuffer2
+    call printf
+    popl %edx
 
 exit:
     movl $1, %eax
