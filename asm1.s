@@ -486,6 +486,7 @@ memDEFRAGMENT: # (NO ARGS) NO RETURN
 
         # File can be fit:
         popl %eax # Recover the index
+        memDEFRAGMENT_mainLoop_moveFile:
         movl -4(%ebp), %edx # Current file descriptor
         memDEFRAGMENT_mainLoop_moveFileLoop:
             cmpl $0, %ebx
@@ -505,7 +506,7 @@ memDEFRAGMENT: # (NO ARGS) NO RETURN
         # Move %eax to the next empty block:
         memDEFRAGMENT_mainLoop_findNextFreeBlockLoop:
             cmpl nTotal, %eax
-            je memDEFRAGMENT_mainLoop_findNextFreeBlockLoop_exit
+            je memDEFRAGMENT_exit
 
             cmpl $0, (%edi, %eax, 4)
             je memDEFRAGMENT_mainLoop_findNextFreeBlockLoop_exit
@@ -516,8 +517,20 @@ memDEFRAGMENT: # (NO ARGS) NO RETURN
 
         jmp memDEFRAGMENT_mainLoop_continue
 
+
         memDEFRAGMENT_mainLoop_cantFit:
-        popl %eax # Pop the index
+        # If file cant be fit, move to the next line and check if it can be fit there
+        popl %eax # Recover the index
+        xorl %edx, %edx
+        divl n # Get the row
+        addl $1, %eax # Get the next row
+        mull n # Get the full index to the first element of the row
+
+        cmpl 0, (%edi, %eax, 4)
+        jne memDEFRAGMENT_mainLoop_findNextFreeBlockLoop # The file is at the start of the line, nothing to do
+
+        jmp memDEFRAGMENT_mainLoop_moveFile
+
 
         memDEFRAGMENT_mainLoop_continue:
         incl %ecx
