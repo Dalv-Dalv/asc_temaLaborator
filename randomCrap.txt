@@ -7,9 +7,16 @@
 11330000->  66677000
 66677000    00000000
 
-%eax = 3
-%ebx = 4
 
+
+55555550
+22222220
+00333377
+00066666
+00000000
+00000000
+00000000
+00000000
 
 .data
 dir_path:    .asciz "/home/dalv/Dalv/University/ASC/TemaLaborator/Test_ReadFilesFromDirectory/Files"    # Path to the directory
