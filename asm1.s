@@ -1,14 +1,14 @@
 # Cerinta bidimensional
 
-.data           
-    mem: .space 4194304 # 2D 1024x1024 Array of longs instead of bytes so that its easier to work with
-    n: .long 1024
-    nTotal: .long 1048576 # n * n
+.data
+    # 4194304 : 1048576
+    mem: .space 256 # 2D 1024x1024 Array of longs instead of bytes so that its easier to work with
+    n: .long 8
+    nTotal: .long 64 # n * n
     
     # Printf/Scanf formats
     format_newLine: .asciz "\n"
 
-    format_numar: .asciz "%d"
     format_numarNL: .asciz "%d\n"
     format_numarSpace: .asciz "%d "
 
@@ -652,7 +652,7 @@ cmd_readOperations: # (NO ARGS) NO RETURN
     movl %esp, %ebp
 
     pushl $nrOperatii
-    pushl $format_numar 
+    pushl $format_numarNL
     call scanf
     popl %edx
     popl %edx
@@ -689,11 +689,6 @@ cmd_readOperations: # (NO ARGS) NO RETURN
         call memDEFRAGMENT
 
         cmd_readOperations_loop_continue:
-
-        pushl $format_newLine
-        call printf
-        popl %edx
-
         decl nrOperatii
         jmp cmd_readOperations_loop
 

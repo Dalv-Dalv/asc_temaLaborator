@@ -519,11 +519,6 @@ cmd_readOperations: # (NO ARGS) NO RETURN
         call memDEFRAGMENT
 
         cmd_readOperations_loop_continue:
-
-        # pushl $format_newLine
-        # call printf
-        # popl %edx
-
         decl nrOperatii
         jmp cmd_readOperations_loop
 

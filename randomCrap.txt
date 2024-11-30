@@ -9,14 +9,14 @@
 
 
 
-55555550
-22222220
-00333377
-00066666
-00000000
-00000000
-00000000
-00000000
+11111111
+22222222
+33333333
+44444444
+55555555
+66666666
+77777777
+88889999
 
 .data
 dir_path:    .asciz "/home/dalv/Dalv/University/ASC/TemaLaborator/Test_ReadFilesFromDirectory/Files"    # Path to the directory
