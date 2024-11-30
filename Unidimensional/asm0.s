@@ -322,8 +322,18 @@ memADD: # (descriptor:.long, dimensiune:.long in bytes) RETURNS (%eax: startInde
         addl %eax, %ebx
         subl $1, %ebx
 
-        pushl %eax # Store registers to keep after function call
-        pushl %ebx # Store registers to keep after function call
+        pushl %eax # Save %eax from createPhysicalFile call
+        pushl %ebx # Save %ebx from createPhysicalFile call
+
+        pushl 8(%ebp)
+        call createPhysicalFile
+        popl %edx
+
+        popl %ebx # Recover %ebx from createPhysicalFile call
+        popl %eax # Recover %eax from createPhysicalFile call
+
+        pushl %eax # Save %eax from fillMemoryRange call
+        pushl %ebx # Save %ebx from fillMemoryRange call
 
         pushl %ebx
         pushl %eax
@@ -333,8 +343,8 @@ memADD: # (descriptor:.long, dimensiune:.long in bytes) RETURNS (%eax: startInde
         popl %edx
         popl %edx
 
-        popl %ebx # Restore registers
-        popl %eax # Restore registers
+        popl %ebx # Recover %ebx from fillMemoryRange call
+        popl %eax # Recover %eax from fillMemoryRange call
 
         pushl %ebx
         pushl %eax
@@ -632,23 +642,7 @@ cmd_readOperations: # (NO ARGS) NO RETURN
 
 .global main
 main:
-    # call cmd_readOperations
-
-    pushl $690
-    call createPhysicalFile
-    popl %edx
-
-    pushl $auxBuffer2
-    call printf
-    popl %edx
-
-    pushl $1
-    call createPhysicalFile
-    popl %edx
-
-    pushl $auxBuffer2
-    call printf
-    popl %edx
+    call cmd_readOperations
 
 exit:
     movl $1, %eax
