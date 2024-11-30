@@ -1,7 +1,7 @@
 # Cerinta bidimensional
 
 .data           
-    mem: .space 64 # 2D 1024x1024 Array of longs instead of bytes so that its easier to work with
+    mem: .space 256 # 2D 1024x1024 Array of longs instead of bytes so that its easier to work with
     n: .long 8
     nTotal: .long 64 # n * n
     
@@ -441,7 +441,9 @@ memDEFRAGMENT: # (NO ARGS) NO RETURN
 
     movl %eax, %ecx # %ecx: Iterator
 
-    xorl %ebx, %ebx # Size of the current file
+    xorl %ebx, %ebx # %ebx: Size of the current file
+
+    pushl $0 # -4(%ebp): current file descriptor
 
     memDEFRAGMENT_mainLoop:
         cmpl nTotal, %ecx
@@ -451,20 +453,23 @@ memDEFRAGMENT: # (NO ARGS) NO RETURN
         je memDEFRAGMENT_mainLoop_continue
 
         # Found a file:
-        movl %ecx, %ebx # Save position of the start of the file for later
+        movl %ecx, %ebx
+        movl (%edi, %ecx, 4), %edx
+        movl %edx, -4(%ebp)
         memDEFRAGMENT_mainLoop_while: # Loop through the file and determine its size 
-            cmpl nTotal, %ebp
+            cmpl nTotal, %ebx
             je memDEFRAGMENT_mainLoop_while_exit
-            cmpl $0, (%edi, %ebx, 4)
-            je memDEFRAGMENT_mainLoop_while_exit
+
+            cmpl %edx, (%edi, %ebx, 4)
+            jne memDEFRAGMENT_mainLoop_while_exit
 
             incl %ebx
             jmp memDEFRAGMENT_mainLoop_while
         memDEFRAGMENT_mainLoop_while_exit:
 
+
         # Check if we can fit the file at %eax
         subl %ecx, %ebx
-        subl $1, %ebx
 
         pushl %eax # Save the index for later
 
@@ -473,18 +478,41 @@ memDEFRAGMENT: # (NO ARGS) NO RETURN
         
         # Calculate how many free blocks theres left until the end of the row
         pushl n
-        subl %edx, (%esp)
-        subl $1, (%esp)
+        subl %edx, (%esp) # Calculate n - %edx
         popl %edx
 
         cmp %edx, %ebx
         jg memDEFRAGMENT_mainLoop_cantFit # File cant fit
 
         # File can be fit:
-
         popl %eax # Recover the index
-        
+        movl -4(%ebp), %edx # Current file descriptor
+        memDEFRAGMENT_mainLoop_moveFileLoop:
+            cmpl $0, %ebx
+            je memDEFRAGMENT_mainLoop_moveFileLoop_exit
 
+            movl $0, (%edi, %ecx, 4)
+            movl %edx, (%edi, %eax, 4)
+
+            incl %eax
+            incl %ecx
+
+            decl %ebx
+            jmp memDEFRAGMENT_mainLoop_moveFileLoop
+
+        memDEFRAGMENT_mainLoop_moveFileLoop_exit:
+
+        # Move %eax to the next empty block:
+        memDEFRAGMENT_mainLoop_findNextFreeBlockLoop:
+            cmpl nTotal, %eax
+            je memDEFRAGMENT_mainLoop_findNextFreeBlockLoop_exit
+
+            cmpl $0, (%edi, %eax, 4)
+            je memDEFRAGMENT_mainLoop_findNextFreeBlockLoop_exit
+
+            incl %eax
+            jmp memDEFRAGMENT_mainLoop_findNextFreeBlockLoop
+        memDEFRAGMENT_mainLoop_findNextFreeBlockLoop_exit:
 
         jmp memDEFRAGMENT_mainLoop_continue
 
@@ -497,9 +525,19 @@ memDEFRAGMENT: # (NO ARGS) NO RETURN
 
     memDEFRAGMENT_mainLoop_exit:
 
+    # #######################################################
+    # #### TEST WITH FILE DELETED AT THE START OF MEMORY ####
+    # #######################################################
+
+
+    # ######################################################
+    # #### TEST WITH FILE AT THE VERY END OF THE MEMORY ####
+    # ######################################################
+
     memDEFRAGMENT_exit:
         call printAllFiles
 
+        popl %edx # Pop -4(%ebp): current file descriptor
         popl %ebp
         ret
 
