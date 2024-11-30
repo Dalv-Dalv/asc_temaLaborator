@@ -7,8 +7,7 @@
     # Printf/Scanf formats
     format_numar: .asciz "%d"
     format_numarNL: .asciz "%d\n"
-    format_addInputNL: .asciz "%d\n%d\n"        
-    format_2numereNL: .asciz "%d %d\n"
+    format_addInputNL: .asciz "%d\n%d\n"
     format_fisierNL: .asciz "%d: (%d, %d)\n"
     format_rangeNL: .asciz "(%d, %d)\n" 
     format_newLine: .asciz "\n"
@@ -55,33 +54,6 @@ printMemoryRange: # (startIndex:.long, endIndex:.long) NO RETURN
         popl %ebp
         ret
 
-# FOR DEBUG: Prints the entire memory array
-printMemory: # (NO ARGS) NO RETURN
-    pushl %ebp
-    movl %esp, %ebp
-
-    lea mem, %edi
-    xorl %ecx, %ecx
-    printMemory_loop:
-        cmpl n, %ecx
-        je printMemory_exit
-
-        pushl %ecx # Save registry before printf call
-
-        pushl (%edi, %ecx, 4)
-        pushl $format_2numereNL
-        call printf
-        popl %ebx
-        popl %ebx
-
-        popl %ecx # Recover registry
-
-        incl %ecx
-        jmp printMemory_loop
-
-    printMemory_exit:
-        popl %ebp
-        ret
 
 # FOR UTILITY: Prints all files in format id: (i, j)
 printAllFiles: # (NO ARGS) NO RETURN

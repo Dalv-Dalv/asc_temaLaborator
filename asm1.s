@@ -1,20 +1,21 @@
 # Cerinta bidimensional
 
 .data           
-    mem: .space 256 # 2D 1024x1024 Array of longs instead of bytes so that its easier to work with
-    n: .long 8
-    nTotal: .long 64 # n * n
+    mem: .space 4194304 # 2D 1024x1024 Array of longs instead of bytes so that its easier to work with
+    n: .long 1024
+    nTotal: .long 1048576 # n * n
     
     # Printf/Scanf formats
+    format_newLine: .asciz "\n"
+
     format_numar: .asciz "%d"
     format_numarNL: .asciz "%d\n"
-    format_addInputNL: .asciz "%d\n%d\n"        
-    format_2numereNL: .asciz "%d %d\n"
+    format_numarSpace: .asciz "%d "
+
+    format_addInputNL: .asciz "%d\n%d\n"
+
     format_descriptor: .asciz "%d: "
-    format_fisierNL: .asciz "%d: ((%d, %d), (%d, %d))\n"
     format_rangeNL: .asciz "((%d, %d), (%d, %d))\n" 
-    format_newLine: .asciz "\n"
-    format_printNumar: .asciz "%d "
 
     # Input related variables:
     nrOperatii: .long 0
@@ -68,7 +69,7 @@ printMemoryRange: # (startX:.long, startY:.long, endX:.long, endY:.long) NO RETU
         pushl %ecx # Save registry before printf call
 
         pushl (%edi, %ecx, 4)
-        pushl $format_printNumar
+        pushl $format_numarSpace
         call printf
         popl %edx
         popl %edx
@@ -688,16 +689,6 @@ cmd_readOperations: # (NO ARGS) NO RETURN
         call memDEFRAGMENT
 
         cmd_readOperations_loop_continue:
-
-        pushl $7
-        pushl $7
-        pushl $0
-        pushl $0
-        call printMemoryRange
-        popl %edx
-        popl %edx
-        popl %edx
-        popl %edx
 
         pushl $format_newLine
         call printf
