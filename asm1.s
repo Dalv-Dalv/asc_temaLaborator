@@ -14,6 +14,7 @@
     format_fisierNL: .asciz "%d: ((%d, %d), (%d, %d))\n"
     format_rangeNL: .asciz "((%d, %d), (%d, %d))\n" 
     format_newLine: .asciz "\n"
+    format_printNumar: .asciz "%d "
 
     # Input related variables:
     nrOperatii: .long 0
@@ -67,7 +68,7 @@ printMemoryRange: # (startX:.long, startY:.long, endX:.long, endY:.long) NO RETU
         pushl %ecx # Save registry before printf call
 
         pushl (%edi, %ecx, 4)
-        pushl $format_numar
+        pushl $format_printNumar
         call printf
         popl %edx
         popl %edx
@@ -258,11 +259,11 @@ memADD: # (descriptor:.long, dimensiune:.long in bytes) NO RETURNS
         divl n
         popl %eax # Recover %eax from div
         cmpl $0, %edx # Check if we moved onto a new line
-        jne memADD_loop__if_endOfLine_exit
+        jne memADD_loop_if_endOfLine_exit
         xorl %ebx, %ebx # Reset counter and index, a file cant occupy multiple lines
         movl %ecx, %eax
 
-        memADD_loop__if_endOfLine_exit:
+        memADD_loop_if_endOfLine_exit:
 
         cmpl $0, (%edi, %ecx, 4)
         jne memADD_if_foundOccupiedBlock
@@ -295,7 +296,8 @@ memADD: # (descriptor:.long, dimensiune:.long in bytes) NO RETURNS
         addl %eax, %ebx
         subl $1, %ebx
 
-        pushl %eax # Store registers to keep after function call
+        pushl %eax # Save %eax from fillMemoryRange call
+        pushl %ebx # Save %ebx from fillMemoryRange call
 
         pushl %ebx
         pushl %eax
@@ -305,7 +307,8 @@ memADD: # (descriptor:.long, dimensiune:.long in bytes) NO RETURNS
         popl %edx
         popl %edx
 
-        popl %eax # Restore registers
+        popl %ebx # Recover %ebx from fillMemoryRange call
+        popl %eax # Recover %eax from fillMemoryRange call
         
         jmp memADD_exit
 
@@ -471,22 +474,32 @@ memDEFRAGMENT: # (NO ARGS) NO RETURN
         # Check if we can fit the file at %eax
         subl %ecx, %ebx
 
-        pushl %eax # Save the index for later
+        pushl %eax # Save %eax from division operation
 
         xorl %edx, %edx
         divl n # In %eax we will have the row (Y value) and in %edx we will have the column (X value)
         
+        popl %eax # Recover %eax from division operation
+
         # Calculate how many free blocks theres left until the end of the row
         pushl n
         subl %edx, (%esp) # Calculate n - %edx
         popl %edx
 
         cmp %edx, %ebx
-        jg memDEFRAGMENT_mainLoop_cantFit # File cant fit
+        jle memDEFRAGMENT_mainLoop_canFit # File can fit
+        # File cant be fit:
 
-        # File can be fit:
-        popl %eax # Recover the index
-        memDEFRAGMENT_mainLoop_moveFile:
+        # If file cant be fit, move to the next line and check if it can be fit there
+        xorl %edx, %edx
+        divl n # Get the row
+        addl $1, %eax # Get the next row
+        mull n # Get the full index to the first element of the row
+
+        cmpl $0, (%edi, %eax, 4)
+        jne memDEFRAGMENT_mainLoop_findNextFreeBlockLoop # The file is at the start of the line, nothing to do
+
+        memDEFRAGMENT_mainLoop_canFit:
         movl -4(%ebp), %edx # Current file descriptor
         memDEFRAGMENT_mainLoop_moveFileLoop:
             cmpl $0, %ebx
@@ -515,22 +528,11 @@ memDEFRAGMENT: # (NO ARGS) NO RETURN
             jmp memDEFRAGMENT_mainLoop_findNextFreeBlockLoop
         memDEFRAGMENT_mainLoop_findNextFreeBlockLoop_exit:
 
-        jmp memDEFRAGMENT_mainLoop_continue
+        cmpl %eax, %ecx
+        jge memDEFRAGMENT_mainLoop
+        movl %eax, %ecx
 
-
-        memDEFRAGMENT_mainLoop_cantFit:
-        # If file cant be fit, move to the next line and check if it can be fit there
-        popl %eax # Recover the index
-        xorl %edx, %edx
-        divl n # Get the row
-        addl $1, %eax # Get the next row
-        mull n # Get the full index to the first element of the row
-
-        cmpl 0, (%edi, %eax, 4)
-        jne memDEFRAGMENT_mainLoop_findNextFreeBlockLoop # The file is at the start of the line, nothing to do
-
-        jmp memDEFRAGMENT_mainLoop_moveFile
-
+        jmp memDEFRAGMENT_mainLoop
 
         memDEFRAGMENT_mainLoop_continue:
         incl %ecx
@@ -687,6 +689,16 @@ cmd_readOperations: # (NO ARGS) NO RETURN
 
         cmd_readOperations_loop_continue:
 
+        pushl $7
+        pushl $7
+        pushl $0
+        pushl $0
+        call printMemoryRange
+        popl %edx
+        popl %edx
+        popl %edx
+        popl %edx
+
         pushl $format_newLine
         call printf
         popl %edx
@@ -703,16 +715,6 @@ cmd_readOperations: # (NO ARGS) NO RETURN
 .global main
 main:
     call cmd_readOperations
-
-    pushl $7
-    pushl $7
-    pushl $0
-    pushl $0
-    call printMemoryRange
-    popl %edx
-    popl %edx
-    popl %edx
-    popl %edx
 
 exit:
     movl $1, %eax
