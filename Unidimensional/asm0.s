@@ -14,14 +14,23 @@
     format_physicalFilePrefix: .asciz "File "
     format_physicalFileSuffix: .asciz ".txt"
 
+    format_string: .asciz "%s"
+
+    format_concrete_file: .asciz "File %d.txt"
+    format_concrete_test: .asciz "File with descriptor %d has a size of %d bytes\n"
+
     # Buffer mainly used for converting numbers to strings
-    auxBuffer1: .space 128
-    auxBuffer2: .space 128
+    auxBuffer1: .space 1024
+    auxBuffer2: .space 1024
+
+    # Buffers for memCONCRETE
+    filesBuffer: .space 4096
+    statBuffer: .space 128
 
     # Input related variables:
     nrOperations: .long 0
     
-    # Auxiliary variables used mainly for scanf; they can be used anywhere without managing call saving
+    # Auxiliary variables used mainly for scanf, they can be used anywhere without managing call saving
     auxVar1: .long 0
     auxVar2: .long 0
 
@@ -494,6 +503,188 @@ memDEFRAGMENT: # (NO ARGS) NO RETURN
 
         popl %ebp
         ret
+# FOR TASK: Concrete
+#   Use and parse syscall_getdents
+memCONCRETE: # (*directoryPath) NO RETURN
+    pushl %ebp
+    movl %esp, %ebp
+
+    # 8(%ebp): directory path
+
+    pushl $0 # -4(%ebp): Directory file descriptor
+    pushl $0 # -8(%ebp): Total number of bytes read
+
+    pushl $0 # -12(%ebp): Current d_reclen
+    pushl $0 # -16(%ebp): Current entry start index
+
+    pushl $0 # -20(%ebp): Size of current file
+    pushl $0 # -24(%ebp): Current file descriptor
+
+    xorl %ecx, %ecx
+    lea auxBuffer2, %edi
+    movl $0x00, (%edi, %ecx, 1) # Reset auxBuffer2 for strings
+
+    # Open directory
+    movl $5, %eax       # Syscall_open
+    movl 8(%ebp), %ebx  # Path
+    movl $0, %ecx       # File mode
+    int $0x80
+    movl %eax, -4(%ebp) # Save directory file descriptor
+
+    # Get directory entries
+    movl $141, %eax         # Syscall_getdents
+    movl -4(%ebp), %ebx      # Directory file descriptor
+    movl $filesBuffer, %ecx # Buffer to read into
+    movl $4096, %edx        # Size of buffer
+    int $0x80
+    movl %eax, -8(%ebp) # Save total number of bytes read
+
+    cmpl $0, %eax # Check if we read anything
+    jle memCONCRETE_closeDirectory
+
+    xorl %ecx, %ecx
+    lea filesBuffer, %edi
+    memCONCRETE_loop:
+        cmpl -8(%ebp), %ecx
+        jge memCONCRETE_closeDirectory
+
+        # Read entry:
+        movl %ecx, -16(%ebp) # Save entry start index
+        addl $8, %ecx # Skip over first 8 bytes
+
+
+        # Read d_reclen:
+        xorl %eax, %eax
+        movb (%edi, %ecx, 1), %al # Read little-endian representation
+        incl %ecx
+        movb (%edi, %ecx, 1), %ah
+        incl %ecx
+
+        movl %eax, -12(%ebp) # Save d_reclen
+
+        # Check if the file is a '.' or '..'
+        cmpb $46, (%edi, %ecx, 1)
+        je memCONCRETE_loop_continue
+
+        pushl %ecx # Save %ecx
+
+        # Extract number from file name
+        movl %edi, %eax
+        addl (%esp), %eax # Get address to the start of the file name
+        pushl $auxVar1
+        pushl $format_concrete_file
+        pushl %eax
+        call sscanf
+        popl %edx
+        popl %edx
+        popl %edx
+
+        # Reset auxBuffer2 for constructing the file path
+        pushl %edi
+
+        xorl %edx, %edx
+        lea auxBuffer2, %edi
+        movl $0x00, (%edi, %edx, 1)
+
+        popl %edi
+
+
+        # Construct full file path
+        pushl 8(%ebp) # Source
+        pushl $auxBuffer2 # Destination
+        call strcat
+        popl %edx
+        popl %edx
+
+        movl %edi, %eax
+        addl (%esp), %eax # %eax = %eax + %ecx
+
+        pushl %eax # Source
+        pushl $auxBuffer2 # Destination
+        call strcat
+        popl %edx
+        popl %edx
+
+        # Open the file
+        movl $5, %eax           # Syscall_open
+        movl $auxBuffer2, %ebx  # File path
+        movl $0, %ecx           # O_RDONLY
+        int $0x80
+        # File descriptor in %eax
+        movl %eax, -24(%ebp)
+
+        # Get statistics about the file
+        movl %eax, %ebx         # File descriptor
+        movl $108, %eax         # Syscall_fstat
+        movl $statBuffer, %ecx  # Buffer to save data into
+        int $0x80
+
+        # Extract file size from the statistics
+        pushl %edi # Save %edi
+        
+        xorl %eax, %eax
+        movl $20, %ecx
+        lea statBuffer, %edi
+        movb (%edi, %ecx, 1), %al # Read little-endian representation
+        incl %ecx
+        movb (%edi, %ecx, 1), %ah
+
+        movl %eax, -20(%ebp) # Save file size
+    
+        popl %edi # Recover %edi
+        popl %ecx # Recover %ecx from all the chaos
+
+        # Close the file
+        movl $6, %eax           # Syscall_close
+        movl -24(%ebp), %ebx    # File descriptor
+        int $0x80
+
+        # FOR DEBUG: Print the file number and size
+        # pushl -20(%ebp)     # File size
+        # pushl auxVar1       # File number
+        # pushl $format_concrete_test
+        # call printf
+        # popl %edx
+        # popl %edx
+        # popl %edx
+
+        # Call memADD with the relevant data
+        pushl %edi # Save %edi from memADD call
+        pushl %ecx # Save %ecx from memADD call
+
+        pushl -20(%ebp)
+        pushl auxVar1 # File descriptor
+        call memADD
+        popl %edx
+        popl %edx
+
+        popl %ecx # Recover %ecx from memADD call
+        popl %edi # Recover %edi from memADD call
+
+
+
+        memCONCRETE_loop_continue:
+        # Move on to next entry:
+        movl -16(%ebp), %ecx # Go back to the start of the entry
+        addl -12(%ebp), %ecx  # Advance by d_reclen number of bytes
+        jmp memCONCRETE_loop
+
+
+    memCONCRETE_closeDirectory:
+    movl $6, %eax       # Syscall_close  
+    movl -4(%ebp), %ebx # File descriptor
+    int $0x80
+
+    memCONCRETE_exit:
+        popl %edx # Pop local variable
+        popl %edx # Pop local variable
+        popl %edx # Pop local variable
+        popl %edx # Pop local variable
+        popl %edx # Pop local variable
+        popl %edx # Pop local variable
+
+        popl %ebp
+        ret
     
 
 # FOR READING:
@@ -585,6 +776,30 @@ cmd_readDELETE: # (NO ARGS) NO RETURN
         popl %ebp
         ret
 
+# FOR READING:
+#   Read memCONCRETE command inputs
+cmd_readCONCRETE: # (NO ARGS) NO RETURN
+    pushl %ebp
+    movl %esp, %ebp
+
+    xorl %ecx, %ecx
+    lea auxBuffer1, %edi
+    movl $0x00, (%edi, %ecx, 1) # Put null character at the start of auxBuffer1 to reset it
+
+    pushl $auxBuffer1
+    pushl $format_string # Read directory path
+    call scanf
+    popl %edx
+    popl %edx
+    
+    pushl $auxBuffer1
+    call memCONCRETE
+    popl %edx 
+
+    cmd_readCONCRETE_exit:
+        popl %ebp
+        ret
+
 
 # FOR READING: 
 #   Main reading function
@@ -622,12 +837,21 @@ cmd_readOperations: # (NO ARGS) NO RETURN
 
         cmpl $3, auxVar1
         jne cmd_readOperations_loop_if_DELETE_exit
-        call cmd_readDELETE
+        call cmd_readDELETE # Read input for DELETE operation and execute it
         jmp cmd_readOperations_loop_continue
         cmd_readOperations_loop_if_DELETE_exit:
 
-        # Execute Defrag operation
-        call memDEFRAGMENT
+        cmpl $4, auxVar1
+        jne cmd_readOperations_loop_if_DEFRAGMENT_exit
+        call memDEFRAGMENT # Execute DEFRAGMENT operation
+        jmp cmd_readOperations_loop_continue
+        cmd_readOperations_loop_if_DEFRAGMENT_exit:
+
+        cmpl $5, auxVar1
+        jne cmd_readOperations_loop_if_DEFRAGMENT_exit
+        call cmd_readCONCRETE # Read input for CONCRETE operation and execute it
+        jmp cmd_readOperations_loop_continue
+        cmd_readOperations_loop_if_CONCRETE_exit:
 
         cmd_readOperations_loop_continue:
         decl nrOperations

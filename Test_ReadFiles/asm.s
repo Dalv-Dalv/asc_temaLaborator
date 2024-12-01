@@ -9,9 +9,7 @@
 
     format_scanf: .asciz "%s"
     format_printf: .asciz "%s\n"
-
-    scanfString: .space 1024
-
+    
     nrBytes: .long 0
 
     auxVar: .long 0
