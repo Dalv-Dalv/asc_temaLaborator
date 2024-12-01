@@ -503,6 +503,7 @@ memDEFRAGMENT: # (NO ARGS) NO RETURN
 
         popl %ebp
         ret
+
 # FOR TASK: Concrete
 #   Use and parse syscall_getdents
 memCONCRETE: # (*directoryPath) NO RETURN
