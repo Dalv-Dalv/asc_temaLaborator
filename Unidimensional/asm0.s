@@ -354,6 +354,14 @@ memADD: # (descriptor:.long, dimensiune:.long in bytes) RETURNS (%eax: startInde
         popl %ebx # Recover %ebx from fillMemoryRange call
         popl %eax # Recover %eax from fillMemoryRange call
 
+        jmp memADD_exit
+
+    memADD_failedToFindSpace:
+        xorl %eax, %eax
+        xorl %ebx, %ebx
+        jmp memADD_exit
+
+    memADD_exit:
         pushl %ebx
         pushl %eax
         pushl 8(%ebp)
@@ -364,14 +372,6 @@ memADD: # (descriptor:.long, dimensiune:.long in bytes) RETURNS (%eax: startInde
         popl %edx
         popl %edx
 
-        jmp memADD_exit
-
-    memADD_failedToFindSpace:
-        xorl %eax, %eax
-        xorl %ebx, %ebx
-        jmp memADD_exit
-
-    memADD_exit:
         popl %edx # Pop local variable
         popl %ebp
         ret
