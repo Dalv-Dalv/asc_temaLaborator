@@ -653,6 +653,12 @@ memCONCRETE: # (*directoryPath) NO RETURN
         pushl %edi # Save %edi from memADD call
         pushl %ecx # Save %ecx from memADD call
 
+        movl $256, %ebx
+        movl auxVar1, %eax
+        xorl %edx, %edx
+        divl %ebx
+        movl %edx, auxVar1
+
         pushl -20(%ebp)
         pushl auxVar1 # File descriptor
         call memADD
