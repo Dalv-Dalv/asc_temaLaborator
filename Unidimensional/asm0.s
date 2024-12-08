@@ -35,101 +35,6 @@
     auxVar2: .long 0
 
 .text
-# FOR UTILITY: Converts number to string
-convertNrToString: # (x:.long, *string) RETURNS VIA *string
-    pushl %ebp
-    movl %esp, %ebp
-
-    movl 8(%ebp), %eax # Number to convert
-
-    xorl %ecx, %ecx
-    convertNrToString_while: # Push all digits onto stack
-        cmpl $0, %eax
-        je convertNrToString_while_exit
-
-        xorl %edx, %edx
-        movl $10, %ebx
-        divl %ebx
-
-        pushl %edx
-
-        incl %ecx
-        jmp convertNrToString_while
-    convertNrToString_while_exit:
-    
-    movl 12(%ebp), %edi
-
-    xorl %edx, %edx # Index in *string
-    convertNrToString_for: # Build the number back up in ascii
-        popl %eax
-
-        addl $0x30, %eax
-        movb %al, (%edi, %edx, 1)
-
-        incl %edx
-        loop convertNrToString_for
-    
-    movb $0x00, (%edi, %edx, 1) # Add null character
-
-    convertNrToString_exit:
-        popl %ebp
-        ret
-
-# FOR UTILITY: Creates file based on given file descriptor
-createPhysicalFile: # (fileDescriptor: .long) NO RETURN
-    pushl %ebp
-    movl %esp, %ebp
-
-    # Put null character at the start of auxBuffer2, effectively resetting it for strcat calls
-    xorl %ecx, %ecx
-    lea auxBuffer2, %edi
-    movb $0x00, (%edi, %ecx, 1)
-
-    pushl $auxBuffer1
-    pushl 8(%ebp)
-    call convertNrToString
-    popl %edx
-    popl %edx
-
-    # Build the name of the file in auxBuffer2
-    # Add the prefix of the file to auxBuffer2
-    pushl $format_physicalFilePrefix
-    pushl $auxBuffer2
-    call strcat
-    popl %edx
-    popl %edx
-
-    # Add the converted file descriptor to auxBuffer2
-    pushl $auxBuffer1
-    pushl $auxBuffer2
-    call strcat
-    popl %edx
-    popl %edx
-
-    # Add the file sufix to auxBuffer2
-    pushl $format_physicalFileSuffix
-    pushl $auxBuffer2
-    call strcat
-    popl %edx
-    popl %edx
-
-    # Add the newLine character to auxBuffer2
-    pushl $format_newLine # FOR DEBUGGING
-    pushl $auxBuffer2
-    call strcat
-    popl %edx
-    popl %edx
-
-    # Create the file physically
-    movl $5, %eax # Syscall_open
-    movl $auxBuffer2, %ebx # File name
-    movl $0101, %ecx # File flags: O_CREAT | O_WRONLY
-    movl $0777, %edx # File permissions: full permissions
-    int $0x80
-
-    createPhysicalFile_exit:
-        popl %ebp
-        ret
 
 # FOR DEBUG: Prints the memory range startIndex:endIndex
 printMemoryRange: # (startIndex:.long, endIndex:.long) NO RETURN
@@ -330,16 +235,6 @@ memADD: # (descriptor:.long, dimensiune:.long in bytes) RETURNS (%eax: startInde
         addl %eax, %ebx
         subl $1, %ebx
 
-        pushl %eax # Save %eax from createPhysicalFile call
-        pushl %ebx # Save %ebx from createPhysicalFile call
-
-        pushl 8(%ebp)
-        call createPhysicalFile
-        popl %edx
-
-        popl %ebx # Recover %ebx from createPhysicalFile call
-        popl %eax # Recover %eax from createPhysicalFile call
-
         pushl %eax # Save %eax from fillMemoryRange call
         pushl %ebx # Save %ebx from fillMemoryRange call
 
@@ -503,6 +398,33 @@ memDEFRAGMENT: # (NO ARGS) NO RETURN
 
         popl %ebp
         ret
+# #############
+# ### DEBUG ###
+# #############
+printFUCK: # (to print)
+    pushl %ebp
+    movl %esp, %ebp
+
+    pushl %eax
+    pushl %ecx
+    pushl %edx
+
+    pushl 8(%ebp)
+    call printf
+    popl %edx
+
+    pushl $format_newLine
+    call printf
+    popl %edx
+    
+    printFUCK_exit:
+        popl %edx
+        popl %ecx
+        popl %eax
+
+        popl %ebp
+        ret
+
 
 # FOR TASK: Concrete
 #   Use and parse syscall_getdents
@@ -569,16 +491,16 @@ memCONCRETE: # (*directoryPath) NO RETURN
 
         pushl %ecx # Save %ecx
 
-        # Extract number from file name
-        movl %edi, %eax
-        addl (%esp), %eax # Get address to the start of the file name
-        pushl $auxVar1
-        pushl $format_concrete_file
-        pushl %eax
-        call sscanf
-        popl %edx
-        popl %edx
-        popl %edx
+        # # Extract number from file name
+        # movl %edi, %eax
+        # addl (%esp), %eax # Get address to the start of the file name
+        # pushl $auxVar1
+        # pushl $format_concrete_file
+        # pushl %eax
+        # call sscanf
+        # popl %edx
+        # popl %edx
+        # popl %edx
 
         # Reset auxBuffer2 for constructing the file path
         pushl %edi
@@ -591,6 +513,10 @@ memCONCRETE: # (*directoryPath) NO RETURN
 
 
         # Construct full file path
+        pushl 8(%ebp)
+        call printFUCK
+        popl %edx
+
         pushl 8(%ebp) # Source
         pushl $auxBuffer2 # Destination
         call strcat
@@ -606,12 +532,17 @@ memCONCRETE: # (*directoryPath) NO RETURN
         popl %edx
         popl %edx
 
+        pushl 8(%ebp)
+        call printFUCK
+        popl %edx
+
         # Open the file
         movl $5, %eax           # Syscall_open
         movl $auxBuffer2, %ebx  # File path
         movl $0, %ecx           # O_RDONLY
         int $0x80
         # File descriptor in %eax
+        movl %eax, auxVar1
         movl %eax, -24(%ebp)
 
         # Get statistics about the file
@@ -653,12 +584,19 @@ memCONCRETE: # (*directoryPath) NO RETURN
         pushl %edi # Save %edi from memADD call
         pushl %ecx # Save %ecx from memADD call
 
-        movl $256, %ebx
+        # auxVar1 % 255 + 1
+        movl $255, %ebx
         movl auxVar1, %eax
         xorl %edx, %edx
         divl %ebx
         movl %edx, auxVar1
+        addl $1, auxVar1
 
+        pushl 8(%ebp)
+        call printFUCK
+        popl %edx
+
+breakpoint:
         pushl -20(%ebp)
         pushl auxVar1 # File descriptor
         call memADD
@@ -668,6 +606,9 @@ memCONCRETE: # (*directoryPath) NO RETURN
         popl %ecx # Recover %ecx from memADD call
         popl %edi # Recover %edi from memADD call
 
+        pushl 8(%ebp)
+        call printFUCK
+        popl %edx
 
 
         memCONCRETE_loop_continue:
