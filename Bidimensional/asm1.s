@@ -1036,6 +1036,10 @@ main:
     call cmd_readOperations
 
 exit:
+    pushl $0
+    call fflush
+    popl %eax
+
     movl $1, %eax
     movl $0, %ebx       
     int $0x80
