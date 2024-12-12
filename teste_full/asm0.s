@@ -249,14 +249,6 @@ memADD: # (descriptor:.long, dimensiune:.long in bytes) RETURNS (%eax: startInde
         popl %ebx # Recover %ebx from fillMemoryRange call
         popl %eax # Recover %eax from fillMemoryRange call
 
-        jmp memADD_exit
-
-    memADD_failedToFindSpace:
-        xorl %eax, %eax
-        xorl %ebx, %ebx
-        jmp memADD_exit
-
-    memADD_exit:
         pushl %ebx
         pushl %eax
         pushl 8(%ebp)
@@ -266,6 +258,24 @@ memADD: # (descriptor:.long, dimensiune:.long in bytes) RETURNS (%eax: startInde
         popl %edx
         popl %edx
         popl %edx
+
+        jmp memADD_exit
+
+    memADD_failedToFindSpace:
+        xorl %eax, %eax
+        xorl %ebx, %ebx
+
+        pushl %ebx
+        pushl %eax
+        pushl $format_rangeNL
+        call printf
+        popl %edx
+        popl %edx
+        popl %edx
+
+        jmp memADD_exit
+
+    memADD_exit:
 
         popl %edx # Pop local variable
         popl %ebp
@@ -398,6 +408,32 @@ memDEFRAGMENT: # (NO ARGS) NO RETURN
 
         popl %ebp
         ret
+# #############
+# ### DEBUG ###
+# #############
+printFUCK: # (to print)
+    pushl %ebp
+    movl %esp, %ebp
+
+    pushl %eax
+    pushl %ecx
+    pushl %edx
+
+    pushl 8(%ebp)
+    call printf
+    popl %edx
+
+    pushl $format_newLine
+    call printf
+    popl %edx
+    
+    printFUCK_exit:
+        popl %edx
+        popl %ecx
+        popl %eax
+
+        popl %ebp
+        ret
 
 
 # FOR TASK: Concrete
@@ -487,6 +523,10 @@ memCONCRETE: # (*directoryPath) NO RETURN
 
 
         # Construct full file path
+        pushl 8(%ebp)
+        call printFUCK
+        popl %edx
+
         pushl 8(%ebp) # Source
         pushl $auxBuffer2 # Destination
         call strcat
@@ -500,6 +540,10 @@ memCONCRETE: # (*directoryPath) NO RETURN
         pushl $auxBuffer2 # Destination
         call strcat
         popl %edx
+        popl %edx
+
+        pushl 8(%ebp)
+        call printFUCK
         popl %edx
 
         # Open the file
@@ -532,10 +576,10 @@ memCONCRETE: # (*directoryPath) NO RETURN
         popl %edi # Recover %edi
         popl %ecx # Recover %ecx from all the chaos
 
-        # # Close the file
-        # movl $6, %eax           # Syscall_close
-        # movl -24(%ebp), %ebx    # File descriptor
-        # int $0x80
+        # Close the file
+        movl $6, %eax           # Syscall_close
+        movl -24(%ebp), %ebx    # File descriptor
+        int $0x80
 
         # FOR DEBUG: Print the file number and size
         # pushl -20(%ebp)     # File size
@@ -558,6 +602,10 @@ memCONCRETE: # (*directoryPath) NO RETURN
         movl %edx, auxVar1
         addl $1, auxVar1
 
+        pushl 8(%ebp)
+        call printFUCK
+        popl %edx
+
 breakpoint:
         pushl -20(%ebp)
         pushl auxVar1 # File descriptor
@@ -567,6 +615,10 @@ breakpoint:
 
         popl %ecx # Recover %ecx from memADD call
         popl %edi # Recover %edi from memADD call
+
+        pushl 8(%ebp)
+        call printFUCK
+        popl %edx
 
 
         memCONCRETE_loop_continue:

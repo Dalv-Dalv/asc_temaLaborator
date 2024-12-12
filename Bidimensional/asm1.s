@@ -38,102 +38,6 @@
     auxVar2: .long 0
 .text
 
-# FOR UTILITY: Converts number to string
-convertNrToString: # (x:.long, *string) RETURNS VIA *string
-    pushl %ebp
-    movl %esp, %ebp
-
-    movl 8(%ebp), %eax # Number to convert
-
-    xorl %ecx, %ecx
-    convertNrToString_while: # Push all digits onto stack
-        cmpl $0, %eax
-        je convertNrToString_while_exit
-
-        xorl %edx, %edx
-        movl $10, %ebx
-        divl %ebx
-
-        pushl %edx
-
-        incl %ecx
-        jmp convertNrToString_while
-    convertNrToString_while_exit:
-    
-    movl 12(%ebp), %edi
-
-    xorl %edx, %edx # Index in *string
-    convertNrToString_for: # Build the number back up in ascii
-        popl %eax
-
-        addl $0x30, %eax
-        movb %al, (%edi, %edx, 1)
-
-        incl %edx
-        loop convertNrToString_for
-    
-    movb $0x00, (%edi, %edx, 1) # Add null character
-
-    convertNrToString_exit:
-        popl %ebp
-        ret
-
-# FOR UTILITY: Creates file based on given file descriptor
-createPhysicalFile: # (fileDescriptor: .long) NO RETURN
-    pushl %ebp
-    movl %esp, %ebp
-
-    # Put null character at the start of auxBuffer2, effectively resetting it for strcat calls
-    xorl %ecx, %ecx
-    lea auxBuffer2, %edi
-    movb $0x00, (%edi, %ecx, 1)
-
-    pushl $auxBuffer1
-    pushl 8(%ebp)
-    call convertNrToString
-    popl %edx
-    popl %edx
-
-    # Build the name of the file in auxBuffer2
-    # Add the prefix of the file to auxBuffer2
-    pushl $format_physicalFilePrefix
-    pushl $auxBuffer2
-    call strcat
-    popl %edx
-    popl %edx
-
-    # Add the converted file descriptor to auxBuffer2
-    pushl $auxBuffer1
-    pushl $auxBuffer2
-    call strcat
-    popl %edx
-    popl %edx
-
-    # Add the file sufix to auxBuffer2
-    pushl $format_physicalFileSuffix
-    pushl $auxBuffer2
-    call strcat
-    popl %edx
-    popl %edx
-
-    # Add the newLine character to auxBuffer2
-    pushl $format_newLine # FOR DEBUGGING
-    pushl $auxBuffer2
-    call strcat
-    popl %edx
-    popl %edx
-
-    # Create the file physically
-    movl $5, %eax # Syscall_open
-    movl $auxBuffer2, %ebx # File name
-    movl $0101, %ecx # File flags: O_CREAT | O_WRONLY
-    movl $0777, %edx # File permissions: full permissions
-    int $0x80
-
-    createPhysicalFile_exit:
-        popl %ebp
-        ret
-
 # FOR DEBUG: Prints the memory range startIndex:endIndex
 printMemoryRange: # (startX:.long, startY:.long, endX:.long, endY:.long) NO RETURN 
     pushl %ebp
@@ -203,14 +107,14 @@ printRange: # (startIndex:.long, endIndex:.long) NO RETURNS
     movl 12(%ebp), %eax
     xorl %edx, %edx
     divl n
-    pushl %eax # %eax: endY
     pushl %edx # %edx: endX
+    pushl %eax # %eax: endY
 
     movl 8(%ebp), %eax
     xorl %edx, %edx
     divl n
-    pushl %eax # %eax: startY
     pushl %edx # %edx: startX
+    pushl %eax # %eax: startY
 
     pushl $format_rangeNL
     call printf
@@ -411,16 +315,6 @@ memADD: # (descriptor:.long, dimensiune:.long in bytes) NO RETURNS
     memADD_foundSpace:
         addl %eax, %ebx
         subl $1, %ebx
-
-        pushl %eax # Save %eax from createPhysicalFile call
-        pushl %ebx # Save %ebx from createPhysicalFile call
-
-        pushl 8(%ebp)
-        call createPhysicalFile
-        popl %edx
-
-        popl %ebx # Recover %ebx from createPhysicalFile call
-        popl %eax # Recover %eax from createPhysicalFile call
 
         pushl %eax # Save %eax from fillMemoryRange call
         pushl %ebx # Save %ebx from fillMemoryRange call
