@@ -594,7 +594,7 @@ memCONCRETE: # (*directoryPath) NO RETURN
 
     # Get directory entries
     movl $141, %eax         # Syscall_getdents
-    movl -4(%ebp), %ebx     # Directory file descriptor
+    movl -4(%ebp), %ebx      # Directory file descriptor
     movl $filesBuffer, %ecx # Buffer to read into
     movl $4096, %edx        # Size of buffer
     int $0x80
