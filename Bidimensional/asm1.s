@@ -14,9 +14,6 @@
     format_rangeNL: .asciz "((%d, %d), (%d, %d))\n" 
     format_newLine: .asciz "\n"
 
-    format_physicalFilePrefix: .asciz "File "
-    format_physicalFileSuffix: .asciz ".txt"
-
     format_string: .asciz "%s"
 
     format_concrete_file: .asciz "File %d.txt"
