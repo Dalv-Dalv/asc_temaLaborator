@@ -27,7 +27,7 @@
     auxBuffer2: .space 1024
 
     # Buffers for memCONCRETE
-    filesBuffer: .space 4096
+    filesBuffer: .space 1048576
     statBuffer: .space 128
 
     # Input related variables:
@@ -243,6 +243,13 @@ fillMemoryRange: # (fillWith:.long, startIndex:.long, endIndex:.long) NO RETURN
 memADD: # (descriptor:.long, dimensiune:.long in bytes) NO RETURNS      
     pushl %ebp
     movl %esp, %ebp
+
+    # Check if the file is already in memory
+    pushl 8(%ebp)
+    call memGET
+    popl %edx
+    cmpl $0, %ebx
+    jne memADD_failedToFindSpace
 
     # -4(%ebp): number of blocks the file requires
     movl 12(%ebp), %eax
@@ -594,7 +601,7 @@ memCONCRETE: # (*directoryPath) NO RETURN
 
     # Get directory entries
     movl $141, %eax         # Syscall_getdents
-    movl -4(%ebp), %ebx     # Directory file descriptor
+    movl -4(%ebp), %ebx      # Directory file descriptor
     movl $filesBuffer, %ecx # Buffer to read into
     movl $4096, %edx        # Size of buffer
     int $0x80
