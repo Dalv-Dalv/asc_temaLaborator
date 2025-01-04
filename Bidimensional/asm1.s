@@ -2,7 +2,7 @@
 
 .data
     # 4194304 : 1024 : 1048576
-    mem: .space 4194304 # 2D 1024x1024 Array of longs instead of bytes so that its easier to work with
+    mem: .space 4194304 # 2D 1024x1024*4 Array of longs instead of bytes so that its easier to work with
     n: .long 1024
     nTotal: .long 1048576 # n * n
     
@@ -16,8 +16,7 @@
 
     format_string: .asciz "%s"
 
-    format_concrete_file: .asciz "File %d.txt"
-    format_concrete_test: .asciz "File with descriptor %d has a size of %d bytes\n"
+    format_concrete: .asciz "%d\n%d\n"
 
     # Buffer mainly used for converting numbers to strings
     auxBuffer1: .space 1024
@@ -241,13 +240,6 @@ memADD: # (descriptor:.long, dimensiune:.long in bytes) NO RETURNS
     pushl %ebp
     movl %esp, %ebp
 
-    # Check if the file is already in memory
-    pushl 8(%ebp)
-    call memGET
-    popl %edx
-    cmpl $0, %ebx
-    jne memADD_failedToFindSpace
-
     # -4(%ebp): number of blocks the file requires
     movl 12(%ebp), %eax
     xorl %edx, %edx
@@ -259,6 +251,13 @@ memADD: # (descriptor:.long, dimensiune:.long in bytes) NO RETURNS
     add $1, %eax
     memADD_if_divRoundUp_exit:
     pushl %eax
+
+    # Check if the file is already in memory
+    pushl 8(%ebp)
+    call memGET
+    popl %edx
+    cmpl $0, %ebx
+    jne memADD_failedToFindSpace
 
     # %eax: start index of current range
     xorl %eax, %eax
@@ -570,6 +569,7 @@ memDEFRAGMENT: # (NO ARGS) NO RETURN
 
 # FOR TASK: Concrete
 #   Use and parse syscall_getdents
+#   Never close files, close only directory
 memCONCRETE: # (*directoryPath) NO RETURN
     pushl %ebp
     movl %esp, %ebp
@@ -585,10 +585,6 @@ memCONCRETE: # (*directoryPath) NO RETURN
     pushl $0 # -20(%ebp): Size of current file
     pushl $0 # -24(%ebp): Current file descriptor
 
-    xorl %ecx, %ecx
-    lea auxBuffer2, %edi
-    movl $0x00, (%edi, %ecx, 1) # Reset auxBuffer2 for strings
-
     # Open directory
     movl $5, %eax       # Syscall_open
     movl 8(%ebp), %ebx  # Path
@@ -598,9 +594,9 @@ memCONCRETE: # (*directoryPath) NO RETURN
 
     # Get directory entries
     movl $141, %eax         # Syscall_getdents
-    movl -4(%ebp), %ebx      # Directory file descriptor
+    movl -4(%ebp), %ebx     # Directory file descriptor
     movl $filesBuffer, %ecx # Buffer to read into
-    movl $4096, %edx        # Size of buffer
+    movl $1048576, %edx     # Size of buffer
     int $0x80
     movl %eax, -8(%ebp) # Save total number of bytes read
 
@@ -631,28 +627,16 @@ memCONCRETE: # (*directoryPath) NO RETURN
         cmpb $46, (%edi, %ecx, 1)
         je memCONCRETE_loop_continue
 
-        pushl %ecx # Save %ecx
-
-        # Extract number from file name
-        movl %edi, %eax
-        addl (%esp), %eax # Get address to the start of the file name
-        pushl $auxVar1
-        pushl $format_concrete_file
-        pushl %eax
-        call sscanf
-        popl %edx
-        popl %edx
-        popl %edx
+        pushl %ecx # Save %ecx from the incoming chaos
 
         # Reset auxBuffer2 for constructing the file path
-        pushl %edi
+        pushl %edi # Save %edi
 
         xorl %edx, %edx
         lea auxBuffer2, %edi
-        movl $0x00, (%edi, %edx, 1)
+        movl $0x00, (%edi, %edx, 1) # Put null character at the start to reset it
 
-        popl %edi
-
+        popl %edi # Recover %edi
 
         # Construct full file path
         pushl 8(%ebp) # Source
@@ -661,7 +645,7 @@ memCONCRETE: # (*directoryPath) NO RETURN
         popl %edx
         popl %edx
 
-        movl %edi, %eax
+        movl %edi, %eax # Get d_name
         addl (%esp), %eax # %eax = %eax + %ecx
 
         pushl %eax # Source
@@ -686,45 +670,56 @@ memCONCRETE: # (*directoryPath) NO RETURN
 
         # Extract file size from the statistics
         pushl %edi # Save %edi
-        
-        xorl %eax, %eax
-        movl $20, %ecx
-        lea statBuffer, %edi
-        movb (%edi, %ecx, 1), %al # Read little-endian representation
-        incl %ecx
-        movb (%edi, %ecx, 1), %ah
 
+        xorl %eax, %eax
+        movl $23, %ecx
+        lea statBuffer, %edi
+        movb (%edi, %ecx, 1), %ah # Read little-endian representation
+        decl %ecx
+        movb (%edi, %ecx, 1), %al
+        shl $16, %eax
+        decl %ecx
+        movb (%edi, %ecx, 1), %ah 
+        decl %ecx
+        movb (%edi, %ecx, 1), %al
+
+
+        xorl %edx, %edx
+        movl $1024, %ebx
+        addl $1023, %ebx # To ceil() it
+        divl %ebx
         movl %eax, -20(%ebp) # Save file size
     
         popl %edi # Recover %edi
         popl %ecx # Recover %ecx from all the chaos
 
-        # Close the file
-        movl $6, %eax           # Syscall_close
-        movl -24(%ebp), %ebx    # File descriptor
-        int $0x80
-
-        # FOR DEBUG: Print the file number and size
-        # pushl -20(%ebp)     # File size
-        # pushl auxVar1       # File number
-        # pushl $format_concrete_test
-        # call printf
-        # popl %edx
-        # popl %edx
-        # popl %edx
-
         # Call memADD with the relevant data
         pushl %edi # Save %edi from memADD call
         pushl %ecx # Save %ecx from memADD call
 
-        movl $256, %ebx
-        movl auxVar1, %eax
+        movl $255, %ebx
+        movl -24(%ebp), %eax
         xorl %edx, %edx
         divl %ebx
-        movl %edx, auxVar1
+        addl $1, %edx
+
+        # Afisare concrete (specificat pe teams "Varianta B")
+        pushl %eax
+        pushl %edx
 
         pushl -20(%ebp)
-        pushl auxVar1 # File descriptor
+        pushl %edx
+        pushl $format_concrete
+        call printf
+        popl %edx
+        popl %edx
+        popl %edx
+
+        popl %edx
+        popl %eax
+
+        pushl -20(%ebp)
+        pushl %edx # File descriptor
         call memADD
         popl %edx
         popl %edx
